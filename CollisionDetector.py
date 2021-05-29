@@ -29,6 +29,7 @@ class CollisionDetector:
         self.ymargin = int( 0.2 * h )
 
         self.min_contour_area = 0.01 * h
+        # i have changed something
 
         # get first keypoints
         self.old_grey = self.get_grey_contour_img(first_img)
