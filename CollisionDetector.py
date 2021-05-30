@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import time
+from sklearn.cluster import FeatureAgglomeration
 
 class CollisionDetector:
 
@@ -8,7 +9,7 @@ class CollisionDetector:
 
         self.vidstream = cv2.VideoCapture(filepath)
         # Setup output video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        fourcc = cv2.VideoWriter_fourcc(*'MP4V')
         self.vidwriter = cv2.VideoWriter("output.mp4", fourcc, 30, (1280, 720), isColor=True)
 
         '''
@@ -29,9 +30,9 @@ class CollisionDetector:
         self.ymargin = int( 0.2 * h )
 
         self.min_contour_area = 0.01 * h
-        # i have changed something
 
         # get first keypoints
+        self.get_grey_contour_img(first_img)
         self.old_grey = self.get_grey_contour_img(first_img)
 
 
@@ -53,35 +54,54 @@ class CollisionDetector:
         return cv2.cvtColor(tempImg, cv2.COLOR_BGR2GRAY)
 
 
-    def cluster_keypoints(self, keyPoints, dist_threshold, max_cluster_size):
+    def cluster_keypoints(self, keypoints, n_clusters=8):
 
-        # sort based on distance to origin
-        keyPoints = keyPoints.tolist()
-        x_ctr = (self.w - self.xmargin) / 2
-        y_ctr = (self.h - self.ymargin) / 2
-        kp_sorted = sorted(keyPoints, key=lambda elem : elem[0][0]**2 + elem[0][1]**2)
+        keypoints = keypoints[::3, :, :]
 
-        clustered_points = []
-        current_cluster = []
+        if len(keypoints) < n_clusters:
+            return np.array(keypoints, dtype=np.float32)
 
-        '''
-        Here we loop through all points. If one is close enough to the next, add it to a cluster
-        This should discard lone keypoints
-        '''
-        for idx in range(len(kp_sorted) - 1):
-            x1, y1 = kp_sorted[idx][0]
-            x2, y2 = kp_sorted[idx+1][0]
+        kp_data = np.reshape(keypoints, (-1, 2)).T
 
-            dist = ( (x2 - x1)**2 + (y2 - y1)**2 ) ** 0.5
+        agglo = FeatureAgglomeration(n_clusters=n_clusters)
+        agglo.fit(kp_data)
 
-            if dist < dist_threshold:
-                current_cluster.append( kp_sorted[idx] )
-            else:
-                if len(current_cluster) > max_cluster_size:
-                    clustered_points += current_cluster
-                    current_cluster = []
+        all_clusters = [ [] for _ in range(n_clusters) ]
+        for kp, cluster_num in zip(keypoints, agglo.labels_):
+            all_clusters[cluster_num].append(kp)
 
-        return np.array(clustered_points, dtype=np.float32)
+        return np.array(keypoints, dtype=np.float32)
+
+
+    # def cluster_keypoints(self, keyPoints, dist_threshold, max_cluster_size):
+
+    #     # sort based on distance to origin
+    #     keyPoints = keyPoints.tolist()
+    #     x_ctr = (self.w - self.xmargin) / 2
+    #     y_ctr = (self.h - self.ymargin) / 2
+    #     kp_sorted = sorted(keyPoints, key=lambda elem : elem[0][0]**2 + elem[0][1]**2)
+
+    #     clustered_points = []
+    #     current_cluster = []
+
+    #     '''
+    #     Here we loop through all points. If one is close enough to the next, add it to a cluster
+    #     This should discard lone keypoints
+    #     '''
+    #     for idx in range(len(kp_sorted) - 1):
+    #         x1, y1 = kp_sorted[idx][0]
+    #         x2, y2 = kp_sorted[idx+1][0]
+
+    #         dist = ( (x2 - x1)**2 + (y2 - y1)**2 ) ** 0.5
+
+    #         if dist < dist_threshold:
+    #             current_cluster.append( kp_sorted[idx] )
+    #         else:
+    #             if len(current_cluster) > max_cluster_size:
+    #                 clustered_points += current_cluster
+    #                 current_cluster = []
+
+    #     return np.array(clustered_points, dtype=np.float32)
 
 
     def get_new_keypoints(self, img_grey, old_kp=None):
@@ -103,7 +123,8 @@ class CollisionDetector:
             return []
 
         # run clustering to reduce the amount of points OF has to track
-        clustered_kp = self.cluster_keypoints(keypoints, dist_threshold=40, max_cluster_size=100)
+        # clustered_kp = self.cluster_keypoints(keypoints, dist_threshold=40, max_cluster_size=100)
+        clustered_kp = self.cluster_keypoints(keypoints)
 
         if len(clustered_kp) == 0:
             return keypoints
@@ -184,12 +205,12 @@ class CollisionDetector:
                 matched_new_kp = self.get_new_keypoints(img_grey.copy())
                 fg = None
 
-            self.show_image(img, matched_new_kp, fg, save_vid=False)
+            self.show_image(img, matched_new_kp, fg, save_vid=True)
 
             self.old_grey = img_grey.copy()
             old_kp = matched_new_kp
 
-            if count % 15 == 0:
+            if count % 30 == 0:
                 '''
                 Periodically search for new features of interest,
                 otherwise only points that were seen at the start will ever be detected
