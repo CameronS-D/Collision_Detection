@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import time
 from sklearn.cluster import FeatureAgglomeration
+from Image import Image
 
 class CollisionDetector:
 
@@ -10,7 +11,7 @@ class CollisionDetector:
         self.vidstream = cv2.VideoCapture(filepath)
         # Setup output video writer
         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-        self.vidwriter = cv2.VideoWriter("output.mp4", fourcc, 30, (1280, 720), isColor=True)
+        self.vid_writer = cv2.VideoWriter("output.mp4", fourcc, 30, (1280, 720), isColor=True)
 
         '''
         initialise background subtractor -> used when getting grey img
@@ -19,39 +20,6 @@ class CollisionDetector:
         varThreshold = 16 is default, value too high means objects arent detected, value too low increase CPU cost by a lot
         '''
         self.bgs = cv2.createBackgroundSubtractorMOG2(history=20, varThreshold=12, detectShadows=False)
-
-        self.vidstream.read()
-        success, first_img = self.vidstream.read()
-
-        # set margin so only objects near the centre of the screen are tracked/detected -> cuts computation time by a lot
-        h, w = first_img.shape[:2]
-        self.h, self.w = h, w
-        self.xmargin = int( 0.2 * w )
-        self.ymargin = int( 0.2 * h )
-
-        self.min_contour_area = 0.01 * h
-
-        # get first keypoints
-        self.get_grey_contour_img(first_img)
-        self.old_grey = self.get_grey_contour_img(first_img)
-
-
-    def get_grey_contour_img(self, image):
-
-        # get region of interest of image
-        image = image[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin].copy()
-
-        # get foreground mask from image and find contours in it
-        fgMask = self.bgs.apply(image, learningRate=0.1)
-        contours, _ = cv2.findContours(fgMask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-        # eliminate small contours
-        contours = [cnt for cnt in contours if cv2.contourArea(cnt) > self.min_contour_area]
-
-        tempImg = np.zeros((*image.shape[:2], 3), np.uint8)
-        cv2.drawContours(tempImg, contours, -1, (128,255,255), -1)
-
-        return cv2.cvtColor(tempImg, cv2.COLOR_BGR2GRAY)
 
 
     def cluster_keypoints(self, keypoints, n_clusters=8):
@@ -104,14 +72,14 @@ class CollisionDetector:
     #     return np.array(clustered_points, dtype=np.float32)
 
 
-    def get_new_keypoints(self, img_grey, old_kp=None):
+    def get_new_keypoints(self, img, old_kp=None):
         '''
         Parameters: greyscale contour image
                     list of keypoints that were tracked by OF on the last iteration
         '''
 
         # Get new keypoints directly from grey img
-        keypoints = cv2.goodFeaturesToTrack(img_grey, maxCorners=3000, qualityLevel=0.1, minDistance=5)
+        keypoints = cv2.goodFeaturesToTrack(img.grey, maxCorners=3000, qualityLevel=0.1, minDistance=5)
 
         if old_kp is not None:
             try:
@@ -176,49 +144,26 @@ class CollisionDetector:
         return obstacles
 
 
-    def show_image(self, img, keyPoints, foreground=None, title="Image", save_vid=False):
-
-        if foreground is None:
-            foreground = [False] * len(keyPoints)
-
-        temp_img = img.copy()
-        # add keypoints to image, then save or show user
-        for coord, near_front in zip(keyPoints, foreground):
-            x, y = coord.ravel()
-            centre = (int(x)+self.xmargin, int(y)+self.ymargin)
-            # colour in BGR
-            colour = (255, 0, 0)
-            if near_front:
-                colour = (0, 0, 255)
-
-            cv2.circle(temp_img, centre, 1, colour, 2)
-
-        if save_vid:
-            self.vidwriter.write(temp_img)
-        else:
-            cv2.imshow(title, temp_img)
-            cv2.waitKey(1)
-
-
     def run(self):
         count = 0
         t0 = time.time()
 
+        success, first_img = self.vidstream.read()
+
+        old_img = Image(first_img, self.bgs)
         # get first keypoints
-        old_kp = self.get_new_keypoints(self.old_grey)
+        old_kp = self.get_new_keypoints(old_img)
 
         while(True):
             success, img = self.vidstream.read()
             if not success:
                 print("Video complete")
                 break
-
-            img_grey = self.get_grey_contour_img(img)
+            new_img = Image(img, self.bgs)
 
             if len(old_kp) != 0:
 
-                new_kp, status, err = cv2.calcOpticalFlowPyrLK(self.old_grey, img_grey, old_kp, None, maxLevel=3)
-
+                new_kp, status, err = cv2.calcOpticalFlowPyrLK(old_img.grey, new_img.grey, old_kp, None, maxLevel=3)
                 # select points that were matched by OF in new frame
                 matched_new_kp = new_kp[status==1]
                 matched_old_kp = old_kp[status==1]
@@ -230,12 +175,12 @@ class CollisionDetector:
                 fg = self.depth_estimation(matched_old_kp, matched_new_kp)
 
             else:
-                matched_new_kp = self.get_new_keypoints(img_grey.copy())
+                matched_new_kp = self.get_new_keypoints(new_img)
                 fg = None
 
-            self.show_image(img, matched_new_kp, fg, save_vid=True)
+            new_img.show(matched_new_kp, fg, vid_writer=self.vid_writer)
 
-            self.old_grey = img_grey.copy()
+            old_img = new_img
             old_kp = matched_new_kp
 
             if count % 30 == 0:
@@ -243,7 +188,7 @@ class CollisionDetector:
                 Periodically search for new features of interest,
                 otherwise only points that were seen at the start will ever be detected
                 '''
-                old_kp = self.get_new_keypoints(self.old_grey, old_kp=matched_new_kp)
+                old_kp = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
                 # for testing purposes
                 t1 = time.time()
                 time_taken = t1 - t0
