@@ -11,7 +11,7 @@ class CollisionDetector:
         self.vidstream = cv2.VideoCapture(filepath)
         # Setup output video writer
         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-        self.vid_writer = cv2.VideoWriter("output.mp4", fourcc, 30, (1280, 720), isColor=True)
+        self.vid_writer = cv2.VideoWriter("output.mp4", fourcc, 30, (int(0.5*1280), int(0.5*720)), isColor=True)
 
         '''
         initialise background subtractor -> used when getting grey img
@@ -29,13 +29,10 @@ class CollisionDetector:
             "dims": []
         }
 
-        if len(keypoints) < 3 * n_clusters:
-            return np.array(keypoints, dtype=np.float32), cluster_info
+        if keypoints is None or len(keypoints) < 3 * n_clusters:
+            return np.array([], dtype=np.float32), cluster_info
 
         keypoints = keypoints[::3, :, :]
-
-        # if len(keypoints) < n_clusters:
-        #     return np.array(keypoints, dtype=np.float32), cluster_info
 
         kp_data = np.reshape(keypoints, (-1, 2)).T
 
@@ -110,15 +107,10 @@ class CollisionDetector:
             except ValueError:
                 keypoints = old_kp
 
-        if keypoints is None:
-            return [], None
-
         # run clustering to reduce the amount of points OF has to track and group points into potential objects
         # clustered_kp = self.cluster_keypoints(keypoints, dist_threshold=40, max_cluster_size=100)
         clustered_kp, cluster_info = self.cluster_keypoints(keypoints)
 
-        if len(clustered_kp) == 0:
-            return keypoints, None
         return clustered_kp, cluster_info
 
     def depth_estimation(self, kp_prev, kp_current):
@@ -132,6 +124,7 @@ class CollisionDetector:
 
         # return bool array to show which points moved further than given threshold
         return distances > np.array(50, dtype=np.float32) # np.median(distances)
+
 
     def proximity_estimation(self, cluster_info, old_img, new_img, scale_threshold):
         # Note: images provided will be cropped and greyscale
@@ -152,7 +145,7 @@ class CollisionDetector:
             prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
             current_temp = new_img.grey[y_min:y_max, x_min:x_max]
 
-            scales = np.arange(1.0, 2.0, 0.1)
+            scales = np.arange(1.1, 2.6, 0.1)
             try:
                 scaled_templates = [cv2.resize(prev_temp, dsize=(0, 0), fx=sf, fy=sf) for sf in scales]
             except cv2.error as e:
@@ -172,7 +165,7 @@ class CollisionDetector:
                     best_scale_score = score
                     best_scale = scales[idx]
 
-            if best_scale >= scale_threshold:
+            if best_scale > scale_threshold:
                 obstacles["centroids"].append((x, y))
                 obstacles["dims"].append((w, h))
 
@@ -207,13 +200,15 @@ class CollisionDetector:
 
                 # get bool array stating which points are estimated to be in the foreground
                 fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-                obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.5)
+                obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=2.4)
 
             else:
                 matched_new_kp, cluster_info = self.get_new_keypoints(new_img)
+                obstacles = None
                 fg = None
 
-            new_img.show(matched_new_kp, fg, vid_writer=self.vid_writer)
+            new_img.add_features(obstacles, matched_new_kp, fg)
+            new_img.show(vid_writer=self.vid_writer)
 
             old_img = new_img
             old_kp = matched_new_kp
