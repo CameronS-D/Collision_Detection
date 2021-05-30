@@ -142,10 +142,38 @@ class CollisionDetector:
         # return bool array to show which points moved further than given threshold
         return distances > np.array(50, dtype=np.float32) # np.median(distances)
 
-    def proximity_estimation(self):
-        pass
-        # TODO: Implement func based on pseudo-code in algorithm 3 in
-        # https://staff.fnwi.uva.nl/a.visser/education/masterProjects/Obstacle%20Avoidance%20using%20Monocular%20Vision%20on%20Micro%20Aerial%20Vehicles_final.pdf
+    def proximity_estimation(self, cluster_midpoints, cluster_dims, scale_threshold, img_prev, img):
+        # Note: images provided will be cropped and greyscale
+
+        obstacles = []
+
+        for (x, y), (w, h) in zip(cluster_midpoints, cluster_dims):
+            x_min = x - w / 2
+            x_max = x_min + w
+            y_min = y - h / 2
+            y_max = y_min + h
+
+            prev_temp = img_prev[y_min:y_max, x_min:x_max]
+            current_temp = img[y_min:y_max, x_min:x_max]
+
+            scales = np.arange(1.0, 2.0, 0.1)
+            scaled_templates = [cv2.resize(prev_temp, dim=(sf*w, sf*h)) for sf in scales]
+
+            best_scale, best_scale_score = 0, 0
+
+            for idx in range(len(scales)):
+                template = scaled_templates[idx]
+                result = cv2.matchTemplate(img, template)
+                _, score, _, _ = cv2.minMaxLoc(result)
+                if score > best_scale_score:
+                    best_scale_score = score
+                    best_scale = scales[idx]
+
+            if best_scale >= scale_threshold:
+                obstacles.append({ "location": (x, y),
+                                   "dims": (w, h)})
+
+        return obstacles
 
 
     def show_image(self, img, keyPoints, foreground=None, title="Image", save_vid=False):
