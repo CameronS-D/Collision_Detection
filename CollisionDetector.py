@@ -3,7 +3,6 @@ import numpy as np
 import time
 from sklearn.cluster import FeatureAgglomeration
 from Image import Image
-from matplotlib import pyplot as plt
 
 class CollisionDetector:
 
@@ -55,7 +54,7 @@ class CollisionDetector:
         for kp, cluster_num in zip(keypoints, agglo.labels_):
             all_clusters[cluster_num].append(kp)
 
-        for cluster in all_clusters.copy():
+        for cluster in all_clusters[:]:
             try:
                 cl = self.filter_cluster(np.array(cluster))
                 xmax, ymax = cl.max(axis=0)[0]
@@ -207,11 +206,7 @@ class CollisionDetector:
         while(True):
             success, img = self.vidstream.read()
             if not success:
-                print("Video complete")
-                scales = [k for k in self.best_matching_scales.keys()]
-                values = [v for v in self.best_matching_scales.values()]
-                plt.plot(scales, values, "x")
-                plt.show()
+                print("\nVideo complete. Output written to output.mp4")
                 break
             new_img = Image(img, self.bgs)
 
@@ -250,7 +245,8 @@ class CollisionDetector:
                 time_taken = t1 - t0
                 vid_time = count / 30
                 error = time_taken - vid_time
-                print(f'Frame: {count} Actual time: {time_taken:.1f} Vid time: {vid_time} Lag: {error:.1f} secs')
+                # print(f'Frame: {count} Actual time: {time_taken:.1f} Vid time: {vid_time} Lag: {error:.1f} secs')
+                print("Frame: {} Actual time: {:.1f} Vid time: {} Lag: {:.1f} secs".format(count, time_taken, vid_time, error))
 
             count += 1
 

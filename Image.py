@@ -29,7 +29,8 @@ class Image:
         contours = [cnt for cnt in contours if cv2.contourArea(cnt) > self.min_contour_area]
 
         # add contours to grey image
-        tempImg = np.zeros((*self.cropped.shape[:2], 1), np.uint8)
+        x, y = self.cropped.shape[:2]
+        tempImg = np.zeros((x, y, 1), np.uint8)
         cv2.drawContours(tempImg, contours, -1, 255, -1)
 
         return tempImg
