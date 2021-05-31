@@ -3,6 +3,7 @@ import numpy as np
 import time
 from sklearn.cluster import FeatureAgglomeration
 from Image import Image
+from matplotlib import pyplot as plt
 
 class CollisionDetector:
 
@@ -20,6 +21,16 @@ class CollisionDetector:
         varThreshold = 16 is default, value too high means objects arent detected, value too low increase CPU cost by a lot
         '''
         self.bgs = cv2.createBackgroundSubtractorMOG2(history=20, varThreshold=12, detectShadows=False)
+
+        self.best_matching_scales = {}
+
+    def filter_cluster(self, data, m = 2.):
+        d = np.abs(data - np.median(data))
+        mdev = np.median(d, axis=0)
+        s = d/mdev #if mdev else 0.
+        std_devs = np.linalg.norm(s, axis=2)
+        m = m * 2 ** 0.5
+        return data[std_devs < m].reshape((-1, 1, 2))
 
 
     def cluster_keypoints(self, keypoints, n_clusters=8):
@@ -43,11 +54,18 @@ class CollisionDetector:
         for kp, cluster_num in zip(keypoints, agglo.labels_):
             all_clusters[cluster_num].append(kp)
 
-        for cluster in all_clusters:
-            cl = np.array(cluster)
+        for cluster in all_clusters.copy():
+            try:
+                cl = self.filter_cluster(np.array(cluster))
+                xmax, ymax = cl.max(axis=0)[0]
+                xmin, ymin = cl.min(axis=0)[0]
+            except ValueError:
+                print("Removing cluster of length ", len(cluster))
+                all_clusters.remove(cluster)
+                print("Tracking", len(all_clusters), "clusters")
+                continue
 
-            xmax, ymax = cl.max(axis=0)[0]
-            xmin, ymin = cl.min(axis=0)[0]
+
             w = int(xmax - xmin)
             h = int(ymax - ymin)
             y_ctr = (ymin + ymax) / 2
@@ -145,7 +163,7 @@ class CollisionDetector:
             prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
             current_temp = new_img.grey[y_min:y_max, x_min:x_max]
 
-            scales = np.arange(1.1, 2.6, 0.1)
+            scales = np.arange(1.5, 3.0, 0.1)
             try:
                 scaled_templates = [cv2.resize(prev_temp, dsize=(0, 0), fx=sf, fy=sf) for sf in scales]
             except cv2.error as e:
@@ -154,21 +172,25 @@ class CollisionDetector:
                 # raise e
                 continue
 
-            best_scale, best_scale_score = 0, 0
+            best_scale, best_scale_score = 0, np.Inf
 
             for idx in range(len(scales)):
                 template = scaled_templates[idx]
-                result = cv2.matchTemplate(current_temp, template, method=cv2.TM_SQDIFF)
-                _, score, _, _ = cv2.minMaxLoc(result)
+                result = cv2.matchTemplate(template, current_temp, method=cv2.TM_SQDIFF )
+                score, _, _, _ = cv2.minMaxLoc(result)
 
-                if score > best_scale_score:
+                if score < best_scale_score:
                     best_scale_score = score
                     best_scale = scales[idx]
+
+            self.best_matching_scales.setdefault(best_scale, 0)
+            self.best_matching_scales[best_scale] += 1
 
             if best_scale > scale_threshold:
                 obstacles["centroids"].append((x, y))
                 obstacles["dims"].append((w, h))
 
+        # print("matched ", len(obstacles["centroids"]), "obstacles")
         return obstacles
 
 
@@ -186,6 +208,10 @@ class CollisionDetector:
             success, img = self.vidstream.read()
             if not success:
                 print("Video complete")
+                scales = [k for k in self.best_matching_scales.keys()]
+                values = [v for v in self.best_matching_scales.values()]
+                plt.plot(scales, values, "x")
+                plt.show()
                 break
             new_img = Image(img, self.bgs)
 
@@ -200,7 +226,7 @@ class CollisionDetector:
 
                 # get bool array stating which points are estimated to be in the foreground
                 fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-                obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=2.4)
+                obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=2.8)
 
             else:
                 matched_new_kp, cluster_info = self.get_new_keypoints(new_img)
@@ -213,7 +239,7 @@ class CollisionDetector:
             old_img = new_img
             old_kp = matched_new_kp
 
-            if count % 30 == 0:
+            if count % 15 == 0:
                 '''
                 Periodically search for new features of interest,
                 otherwise only points that were seen at the start will ever be detected

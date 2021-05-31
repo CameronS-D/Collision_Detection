@@ -47,7 +47,7 @@ class Image:
                 end_cnr = ( self.xmargin + x + w//2,
                             self.ymargin + y + h//2)
 
-                cv2.rectangle(self.original, start_cnr, end_cnr, color=(0, 0, 255), thickness=5)
+                cv2.rectangle(self.original, start_cnr, end_cnr, color=(0, 0, 255), thickness=3)
 
         # add keypoints
         if keypoints is not None:
