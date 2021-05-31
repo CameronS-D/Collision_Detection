@@ -27,3 +27,7 @@ Now clone the repo and install dependencies using:
     git clone https://github.com/GDP-Drone-2021/Collision_Detection.git
     cd Collision_Detection
     pip install -r requirements.txt
+
+You should now be able to run the program using:
+
+    python CollisionDetector.py
