@@ -23,7 +23,7 @@ class Image:
 
         # get foreground mask from image and find contours in it
         fgMask = self.bgs.apply(self.cropped, learningRate=0.1)
-        contours, _ = cv2.findContours(fgMask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours, _ = cv2.findContours(fgMask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         # eliminate small contours
         contours = [cnt for cnt in contours if cv2.contourArea(cnt) > self.min_contour_area]
