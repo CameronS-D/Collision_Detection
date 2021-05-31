@@ -14,6 +14,7 @@ class Image:
         self.ymargin = int( Image.margin_sf * self.h )
 
         self.min_contour_area = 0.01 * self.h
+        self.centre = (int(self.w / 2), int(self.h / 2))
 
         self.cropped = self.original[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin]
         self.grey = self.get_grey_contour_img()
@@ -47,7 +48,7 @@ class Image:
                 end_cnr = ( self.xmargin + x + w//2,
                             self.ymargin + y + h//2)
 
-                cv2.rectangle(self.original, start_cnr, end_cnr, color=(0, 0, 255), thickness=3)
+                cv2.rectangle(self.original, start_cnr, end_cnr, color=(0, 0, 255), thickness=2)
 
         # add keypoints
         if keypoints is not None:
@@ -66,24 +67,11 @@ class Image:
                 cv2.circle(self.original, centre, radius=2, color=colour, thickness=-1)
 
 
+        cv2.circle(self.original, self.centre, radius=6, color=(0, 255, 0), thickness=1)
+
+
 
     def show(self, title="Image", vid_writer=None):
-
-        # if is_foreground is None:
-        #     is_foreground = [False] * len(keyPoints)
-
-        # temp_img = self.original
-        # # add keypoints to image, then save or show user
-        # for coord, near_front in zip(keyPoints, is_foreground):
-        #     x, y = coord.ravel()
-        #     centre = ( int(x) + self.xmargin, int(y) + self.ymargin )
-
-        #     # colour in BGR
-        #     colour = (255, 0, 0)
-        #     if near_front:
-        #         colour = (0, 0, 255)
-
-        #     cv2.circle(temp_img, centre, radius=2, color=colour, thickness=-1)
 
         if vid_writer is not None:
             vid_writer.write(self.original)

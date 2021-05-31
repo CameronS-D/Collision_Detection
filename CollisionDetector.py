@@ -27,9 +27,10 @@ class CollisionDetector:
     def filter_cluster(self, data, m = 2.):
         d = np.abs(data - np.median(data))
         mdev = np.median(d, axis=0)
-        s = d/mdev #if mdev else 0.
+        s = d/mdev
         std_devs = np.linalg.norm(s, axis=2)
-        m = m * 2 ** 0.5
+        np.nan_to_num(std_devs, copy=False)
+        m *= 2 ** 0.5
         return data[std_devs < m].reshape((-1, 1, 2))
 
 
@@ -155,6 +156,8 @@ class CollisionDetector:
         dims = cluster_info["dims"]
 
         for (x, y), (w, h) in zip(centroids, dims):
+            if w * h < 2500:
+                continue
             x_min = max(0, x - w // 2)
             x_max = x_min + w
             y_min = max(0, y - h // 2)
@@ -163,13 +166,10 @@ class CollisionDetector:
             prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
             current_temp = new_img.grey[y_min:y_max, x_min:x_max]
 
-            scales = np.arange(1.5, 3.0, 0.1)
+            scales = np.arange(2.5, 3.5, 0.1)
             try:
                 scaled_templates = [cv2.resize(prev_temp, dsize=(0, 0), fx=sf, fy=sf) for sf in scales]
             except cv2.error as e:
-                # print("x: ", x_min, x_max)
-                # print("y: ", y_min, y_max)
-                # raise e
                 continue
 
             best_scale, best_scale_score = 0, np.Inf
@@ -226,25 +226,25 @@ class CollisionDetector:
 
                 # get bool array stating which points are estimated to be in the foreground
                 fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-                obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=2.8)
-
+                obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=3.3)
+                old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
             else:
-                matched_new_kp, cluster_info = self.get_new_keypoints(new_img)
+                old_kp, cluster_info = self.get_new_keypoints(new_img)
                 obstacles = None
                 fg = None
 
-            new_img.add_features(obstacles, matched_new_kp, fg)
+            new_img.add_features(obstacles, old_kp, fg)
             new_img.show(vid_writer=self.vid_writer)
 
             old_img = new_img
-            old_kp = matched_new_kp
+            # old_kp = matched_new_kp
 
-            if count % 15 == 0:
+            if count % 30 == 0:
                 '''
                 Periodically search for new features of interest,
                 otherwise only points that were seen at the start will ever be detected
                 '''
-                old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
+                # old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
                 # for testing purposes
                 t1 = time.time()
                 time_taken = t1 - t0
