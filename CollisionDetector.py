@@ -10,8 +10,13 @@ class CollisionDetector:
 
         self.vidstream = cv2.VideoCapture(filepath)
         # Setup output video writer
-        fourcc = cv2.VideoWriter_fourcc(*'MPEG')
-        self.vid_writer = cv2.VideoWriter("output.avi", fourcc, 30, (int(0.5*1280), int(0.5*720)), isColor=True)
+        if cv2.__version__[0] == "3":
+            codec, extn = 'MPEG', "avi"
+        else:
+            codec, extn = 'mp4v', "mp4"
+
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        self.vid_writer = cv2.VideoWriter("output." + extn, fourcc, 30, (int(0.5*1280), int(0.5*720)), isColor=True)
 
         '''
         initialise background subtractor -> used when getting grey img
@@ -145,7 +150,6 @@ class CollisionDetector:
 
 
     def proximity_estimation(self, cluster_info, old_img, new_img, scale_threshold):
-        # Note: images provided will be cropped and greyscale
 
         obstacles = {
             "centroids": [],
@@ -189,7 +193,6 @@ class CollisionDetector:
                 obstacles["centroids"].append((x, y))
                 obstacles["dims"].append((w, h))
 
-        # print("matched ", len(obstacles["centroids"]), "obstacles")
         return obstacles
 
 
@@ -223,6 +226,7 @@ class CollisionDetector:
                 fg = self.depth_estimation(matched_old_kp, matched_new_kp)
                 obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=3.3)
                 old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
+
             else:
                 old_kp, cluster_info = self.get_new_keypoints(new_img)
                 obstacles = None
@@ -245,7 +249,6 @@ class CollisionDetector:
                 time_taken = t1 - t0
                 vid_time = count / 30
                 error = time_taken - vid_time
-                # print(f'Frame: {count} Actual time: {time_taken:.1f} Vid time: {vid_time} Lag: {error:.1f} secs')
                 print("Frame: {} Actual time: {:.1f} Vid time: {} Lag: {:.1f} secs".format(count, time_taken, vid_time, error))
 
             count += 1

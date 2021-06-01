@@ -14,9 +14,6 @@ class CollisionDetector:
     def __init__(self, filepath):
 
         self.vidstream = cv2.VideoCapture(filepath)
-        # Setup output video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        # self.vidwriter = cv2.VideoWriter("output.mp4", fourcc, 30, (1280, 720), isColor=True)
 
         '''
         initialise background subtractor -> used when getting grey img
