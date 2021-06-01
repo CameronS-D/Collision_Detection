@@ -18,7 +18,6 @@ class CollisionDetector:
 
         fourcc = cv2.VideoWriter_fourcc(*codec)
         self.vid_writer = cv2.VideoWriter("output." + extn, fourcc, 30, (int(0.5*1280), int(0.5*720)), isColor=True)
-
         '''
         initialise background subtractor -> used when getting grey img
         low history value gives more accurate reults, but increases CPU cost
@@ -210,7 +209,7 @@ class CollisionDetector:
         while(True):
             success, img = self.vidstream.read()
             if not success:
-                print("\nVideo complete. Output written to output.mp4")
+                print("\nVideo complete. Output written to output.mp4 or output.avi")
                 break
             new_img = Image(img, self.bgs)
 
