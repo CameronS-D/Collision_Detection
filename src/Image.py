@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 class Image:
-    margin_sf = 0.2
+    margin_sf = 0.1
 
     def __init__(self, img, bgs):
         # resize image to lower resolution to reduce computation cost

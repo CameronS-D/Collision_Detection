@@ -17,7 +17,7 @@ class CollisionDetector:
             codec, extn = 'mp4v', "mp4"
 
         fourcc = cv2.VideoWriter_fourcc(*codec)
-        self.vid_writer = cv2.VideoWriter("output." + extn, fourcc, 30, (int(0.5*1280), int(0.5*720)), isColor=True)
+        self.vid_writer = cv2.VideoWriter("output." + extn, fourcc, 30, (int(0.5*960), int(0.5*720)), isColor=True)
         '''
         initialise background subtractor -> used when getting grey img
         low history value gives more accurate reults, but increases CPU cost
@@ -225,6 +225,7 @@ class CollisionDetector:
 
         new_img.add_features(obstacles, old_kp, fg)
         new_img.show(vid_writer=self.vid_writer)
+        print("Finished processing frame")
 
         self.old_img = new_img
         self.old_kp, self.cluster_info = old_kp, cluster_info
