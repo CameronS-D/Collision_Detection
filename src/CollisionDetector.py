@@ -7,9 +7,9 @@ from Image import Image
 
 class CollisionDetector:
 
-    def __init__(self, filepath):
+    def __init__(self):
 
-        self.vidstream = cv2.VideoCapture(filepath)
+        # self.vidstream = cv2.VideoCapture(filepath)
         # Setup output video writer
         if cv2.__version__[0] == "3":
             codec, extn = 'MPEG', "avi"
@@ -25,8 +25,8 @@ class CollisionDetector:
         varThreshold = 16 is default, value too high means objects arent detected, value too low increase CPU cost by a lot
         '''
         self.bgs = cv2.createBackgroundSubtractorMOG2(history=20, varThreshold=12, detectShadows=False)
+        self.old_img, self.old_kp, self.cluster_info = None, None, None
 
-        self.best_matching_scales = {}
 
     def filter_cluster(self, data, m = 2.):
         d = np.abs(data - np.median(data))
@@ -186,9 +186,6 @@ class CollisionDetector:
                     best_scale_score = score
                     best_scale = scales[idx]
 
-            self.best_matching_scales.setdefault(best_scale, 0)
-            self.best_matching_scales[best_scale] += 1
-
             if best_scale > scale_threshold:
                 obstacles["centroids"].append((x, y))
                 obstacles["dims"].append((w, h))
@@ -196,7 +193,47 @@ class CollisionDetector:
         return obstacles
 
 
+    def process_frame(self, frame):
+
+        new_img = Image(frame, self.bgs)
+
+        if self.old_img is None:
+            self.old_img = new_img
+            self.old_kp, self.cluster_info = self.get_new_keypoints(new_img)
+            return
+
+        old_img, old_kp, cluster_info = self.old_img, self.old_kp, self.cluster_info
+
+        if len(old_kp) != 0:
+            new_kp, status, err = cv2.calcOpticalFlowPyrLK(old_img.grey, new_img.grey, old_kp, None, maxLevel=3)
+            # select points that were matched by OF in new frame
+            matched_new_kp = new_kp[status==1]
+            matched_old_kp = old_kp[status==1]
+            # reshape for use with other functions
+            matched_new_kp = matched_new_kp.reshape((-1, 1, 2))
+            matched_old_kp = matched_old_kp.reshape((-1, 1, 2))
+
+            # get bool array stating which points are estimated to be in the foreground
+            fg = self.depth_estimation(matched_old_kp, matched_new_kp)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=3.3)
+            old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
+
+        else:
+            old_kp, cluster_info = self.get_new_keypoints(new_img)
+            obstacles = None
+            fg = None
+
+        new_img.add_features(obstacles, old_kp, fg)
+        new_img.show(vid_writer=self.vid_writer)
+
+        self.old_img = new_img
+        self.old_kp, self.cluster_info = old_kp, cluster_info
+
+
     def run(self):
+        # Now obsolete
+
+
         count = 0
         t0 = time.time()
 
@@ -256,4 +293,11 @@ class CollisionDetector:
 
 if __name__ == "__main__":
     CD = CollisionDetector("../videos/beach_with_trees.mp4")
-    CD.run()
+    # CD.run()
+    vidstream = cv2.VideoCapture("../videos/beach_with_trees.mp4")
+    while True:
+        success, img = vidstream.read()
+        if not success:
+            print("\nVideo complete. Output written to output.mp4 or output.avi")
+            break
+        CD.process_frame(img)
