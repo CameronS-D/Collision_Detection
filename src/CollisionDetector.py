@@ -11,13 +11,13 @@ class CollisionDetector:
 
         # self.vidstream = cv2.VideoCapture(filepath)
         # Setup output video writer
-        if cv2.__version__[0] == "3":
-            codec, extn = 'MPEG', "avi"
-        else:
-            codec, extn = 'mp4v', "mp4"
+        # if cv2.__version__[0] == "3":
+        #     codec, extn = 'MPEG', "avi"
+        # else:
+        #     codec, extn = 'mp4v', "mp4"
 
-        fourcc = cv2.VideoWriter_fourcc(*codec)
-        self.vid_writer = cv2.VideoWriter("output." + extn, fourcc, 30, (int(0.5*960), int(0.5*720)), isColor=True)
+        # fourcc = cv2.VideoWriter_fourcc(*codec)
+        # self.vid_writer = cv2.VideoWriter("output." + extn, fourcc, 30, (int(0.5*1280), int(0.5*720)), isColor=True)
         '''
         initialise background subtractor -> used when getting grey img
         low history value gives more accurate reults, but increases CPU cost
@@ -26,6 +26,19 @@ class CollisionDetector:
         '''
         self.bgs = cv2.createBackgroundSubtractorMOG2(history=20, varThreshold=12, detectShadows=False)
         self.old_img, self.old_kp, self.cluster_info = None, None, None
+        self.frame_count = 0
+
+
+    def setup_vid_writer(self, img):
+
+        if cv2.__version__[0] == "3":
+            codec, extn = 'MPEG', "avi"
+        else:
+            codec, extn = 'mp4v', "mp4"
+
+        h, w = img.original.shape[:2]
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        self.vid_writer = cv2.VideoWriter("../videos/output." + extn, fourcc, 30, (w, h), isColor=True)
 
 
     def filter_cluster(self, data, m = 2.):
@@ -195,16 +208,21 @@ class CollisionDetector:
 
     def process_frame(self, frame):
 
+        t0 = time.time()
+
         new_img = Image(frame, self.bgs)
 
         if self.old_img is None:
+            self.setup_vid_writer(new_img)
             self.old_img = new_img
             self.old_kp, self.cluster_info = self.get_new_keypoints(new_img)
+            self.frame_count += 1
             return
 
         old_img, old_kp, cluster_info = self.old_img, self.old_kp, self.cluster_info
 
         if len(old_kp) != 0:
+
             new_kp, status, err = cv2.calcOpticalFlowPyrLK(old_img.grey, new_img.grey, old_kp, None, maxLevel=3)
             # select points that were matched by OF in new frame
             matched_new_kp = new_kp[status==1]
@@ -225,15 +243,18 @@ class CollisionDetector:
 
         new_img.add_features(obstacles, old_kp, fg)
         new_img.show(vid_writer=self.vid_writer)
-        print("Finished processing frame")
+
+        if self.frame_count % 10 == 0:
+            time_taken = time.time() - t0
+            print("Took {:.3f} seconds to process frame {}".format(time_taken, self.frame_count))
 
         self.old_img = new_img
         self.old_kp, self.cluster_info = old_kp, cluster_info
+        self.frame_count += 1
 
 
     def run(self):
         # Now obsolete
-
 
         count = 0
         t0 = time.time()
@@ -293,7 +314,7 @@ class CollisionDetector:
 
 
 if __name__ == "__main__":
-    CD = CollisionDetector("../videos/beach_with_trees.mp4")
+    CD = CollisionDetector()
     # CD.run()
     vidstream = cv2.VideoCapture("../videos/beach_with_trees.mp4")
     while True:
