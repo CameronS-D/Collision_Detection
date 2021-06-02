@@ -9,15 +9,6 @@ class CollisionDetector:
 
     def __init__(self):
 
-        # self.vidstream = cv2.VideoCapture(filepath)
-        # Setup output video writer
-        # if cv2.__version__[0] == "3":
-        #     codec, extn = 'MPEG', "avi"
-        # else:
-        #     codec, extn = 'mp4v', "mp4"
-
-        # fourcc = cv2.VideoWriter_fourcc(*codec)
-        # self.vid_writer = cv2.VideoWriter("output." + extn, fourcc, 30, (int(0.5*1280), int(0.5*720)), isColor=True)
         '''
         initialise background subtractor -> used when getting grey img
         low history value gives more accurate reults, but increases CPU cost
@@ -182,7 +173,7 @@ class CollisionDetector:
             prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
             current_temp = new_img.grey[y_min:y_max, x_min:x_max]
 
-            scales = np.arange(2.5, 3.5, 0.1)
+            scales = np.arange(1.1, 2.0, 0.1)
             try:
                 scaled_templates = [cv2.resize(prev_temp, dsize=(0, 0), fx=sf, fy=sf) for sf in scales]
             except cv2.error as e:
@@ -192,7 +183,9 @@ class CollisionDetector:
 
             for idx in range(len(scales)):
                 template = scaled_templates[idx]
-                result = cv2.matchTemplate(template, current_temp, method=cv2.TM_SQDIFF )
+                result = cv2.matchTemplate(template, current_temp, method=cv2.TM_SQDIFF_NORMED )
+                # print(result)
+                cv2.waitKey(0)
                 score, _, _, _ = cv2.minMaxLoc(result)
 
                 if score < best_scale_score:
@@ -233,7 +226,7 @@ class CollisionDetector:
 
             # get bool array stating which points are estimated to be in the foreground
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=3.3)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.5)
             old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
 
         else:
