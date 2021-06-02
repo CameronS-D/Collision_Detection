@@ -3,6 +3,10 @@ references/
 
 # files
 openCVtest.py
+output.mp4
+output.avi
+src/output.mp4
+src/output.avi
 
 
 # Byte-compiled / optimized / DLL files
