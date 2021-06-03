@@ -1,4 +1,5 @@
 #!/usr/bin/env python2.7
+from __future__ import division
 import cv2, time, os
 import numpy as np
 from sklearn.cluster import FeatureAgglomeration
