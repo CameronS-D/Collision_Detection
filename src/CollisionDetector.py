@@ -160,7 +160,9 @@ class CollisionDetector:
         distances = [np.linalg.norm(p1 - p0) for p0, p1 in zip(kp_prev, kp_current)]
 
         # return bool array to show which points moved further than given threshold
-        return distances > np.array(50, dtype=np.float32) # np.median(distances)
+        if self.frame_count % 10 == 0:
+            print("Average distance moved: {:.3f}, max moved: {:.3f}".format(np.average(distances), max(distances)))
+        return distances > np.array(20, dtype=np.float32) # np.median(distances)
 
 
     def proximity_estimation(self, cluster_info, old_img, new_img, scale_threshold):
