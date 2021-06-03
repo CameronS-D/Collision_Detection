@@ -26,11 +26,14 @@ class CollisionDetector:
         else:
             codec, extn = 'mp4v', "mp4"
 
+        if os.getcwd().endswith("src"):
+            os.chdir("..")
+
         if not os.path.isdir("videos"):
             os.mkdir("videos")
 
-        filename = "videos/output." + extn
-        print("Writing output to " + os.path.join(os.getcwd(), filename))
+        filename = os.path.join(os.getcwd(), "videos", "output." + extn)
+        print("Writing output to {}".format(filename))
 
         h, w = img.original.shape[:2]
         fourcc = cv2.VideoWriter_fourcc(*codec)
@@ -180,7 +183,7 @@ class CollisionDetector:
             prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
             current_temp = new_img.grey[y_min:y_max, x_min:x_max]
 
-            scales = np.arange(1.1, 2.0, 0.1)
+            scales = np.arange(1.0, 2.0, 0.1)
             try:
                 scaled_templates = [cv2.resize(prev_temp, dsize=(0, 0), fx=sf, fy=sf) for sf in scales]
             except cv2.error as e:
@@ -224,7 +227,7 @@ class CollisionDetector:
         else:
             old_kp, cluster_info = self.cluster_keypoints(old_kp)
 
-        if len(old_kp) != 0:            
+        if len(old_kp) != 0:
 
             new_kp, status, err = cv2.calcOpticalFlowPyrLK(old_img.grey, new_img.grey, old_kp, None, maxLevel=3)
 
