@@ -1,7 +1,6 @@
 #!/usr/bin/env python2.7
-import cv2
+import cv2, time, os
 import numpy as np
-import time
 from sklearn.cluster import FeatureAgglomeration
 from Image import Image
 
@@ -27,9 +26,15 @@ class CollisionDetector:
         else:
             codec, extn = 'mp4v', "mp4"
 
+        if not os.path.isdir("videos"):
+            os.mkdir("videos")
+
+        filename = "videos/output." + extn
+        print("Writing output to " + os.path.join(os.getcwd(), filename))
+
         h, w = img.original.shape[:2]
         fourcc = cv2.VideoWriter_fourcc(*codec)
-        self.vid_writer = cv2.VideoWriter("../videos/output." + extn, fourcc, 30, (w, h), isColor=True)
+        self.vid_writer = cv2.VideoWriter(filename, fourcc, 30, (w, h), isColor=True)
 
 
     def filter_cluster(self, data, m = 2.):
@@ -42,17 +47,15 @@ class CollisionDetector:
         return data[std_devs < m].reshape((-1, 1, 2))
 
 
-    def cluster_keypoints(self, keypoints, n_clusters=8):
+    def cluster_keypoints(self, keypoints, n_clusters=4):
 
         cluster_info = {
             "centroids": [],
             "dims": []
         }
 
-        if keypoints is None or len(keypoints) < 3 * n_clusters:
+        if keypoints is None or len(keypoints) < n_clusters:
             return np.array([], dtype=np.float32), cluster_info
-
-        keypoints = keypoints[::3, :, :]
 
         kp_data = np.reshape(keypoints, (-1, 2)).T
 
@@ -126,7 +129,10 @@ class CollisionDetector:
         '''
 
         # Get new keypoints directly from grey img
-        keypoints = cv2.goodFeaturesToTrack(img.grey, maxCorners=3000, qualityLevel=0.1, minDistance=5)
+        keypoints = cv2.goodFeaturesToTrack(img.grey, maxCorners=1500, qualityLevel=0.1, minDistance=10)
+
+        if keypoints is not None and len(keypoints) > 3:
+            keypoints = keypoints[::3, :, :]
 
         if old_kp is not None:
             try:
@@ -136,6 +142,7 @@ class CollisionDetector:
 
         # run clustering to reduce the amount of points OF has to track and group points into potential objects
         # clustered_kp = self.cluster_keypoints(keypoints, dist_threshold=40, max_cluster_size=100)
+
         clustered_kp, cluster_info = self.cluster_keypoints(keypoints)
 
         return clustered_kp, cluster_info
@@ -184,8 +191,6 @@ class CollisionDetector:
             for idx in range(len(scales)):
                 template = scaled_templates[idx]
                 result = cv2.matchTemplate(template, current_temp, method=cv2.TM_SQDIFF_NORMED )
-                # print(result)
-                cv2.waitKey(0)
                 score, _, _, _ = cv2.minMaxLoc(result)
 
                 if score < best_scale_score:
@@ -214,9 +219,15 @@ class CollisionDetector:
 
         old_img, old_kp, cluster_info = self.old_img, self.old_kp, self.cluster_info
 
-        if len(old_kp) != 0:
+        if self.frame_count % 30 == 0:
+                old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=old_kp)
+        else:
+            old_kp, cluster_info = self.cluster_keypoints(old_kp)
+
+        if len(old_kp) != 0:            
 
             new_kp, status, err = cv2.calcOpticalFlowPyrLK(old_img.grey, new_img.grey, old_kp, None, maxLevel=3)
+
             # select points that were matched by OF in new frame
             matched_new_kp = new_kp[status==1]
             matched_old_kp = old_kp[status==1]
@@ -226,8 +237,9 @@ class CollisionDetector:
 
             # get bool array stating which points are estimated to be in the foreground
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.5)
-            old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.7)
+            old_kp = matched_new_kp
+
 
         else:
             old_kp, cluster_info = self.get_new_keypoints(new_img)
