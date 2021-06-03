@@ -210,7 +210,7 @@ class CollisionDetector:
                     best_scale_score = score
                     best_scale = scale
 
-            if best_scale > scale_threshold and best_scale_score < 0.8 * control_score:
+            if best_scale > scale_threshold and best_scale_score < 0.75 * control_score:
                 obstacles["centroids"].append((x, y))
                 obstacles["dims"].append((width, height))
 
@@ -250,7 +250,7 @@ class CollisionDetector:
 
             # get bool array stating which points are estimated to be in the foreground
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.2)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.4)
             old_kp = matched_new_kp
 
 
