@@ -172,37 +172,47 @@ class CollisionDetector:
         centroids = cluster_info["centroids"]
         dims = cluster_info["dims"]
 
-        for (x, y), (w, h) in zip(centroids, dims):
-            if w * h < 2500:
+        for (x, y), (width, height) in zip(centroids, dims):
+            if width * height < 2500:
                 continue
-            x_min = max(0, x - w // 2)
-            x_max = x_min + w
-            y_min = max(0, y - h // 2)
-            y_max = y_min + h
+            w = width * 1.2/9
+            h = height * 1.2/9
+            x_min = max(0, int(x - w / 2))
+            x_max = int(x_min + w)
+            y_min = max(0, int(y - h / 2))
+            y_max = int(y_min + h)
 
             prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
-            current_temp = new_img.grey[y_min:y_max, x_min:x_max]
 
-            scales = np.arange(1.0, 2.0, 0.1)
-            try:
-                scaled_templates = [cv2.resize(prev_temp, dsize=(0, 0), fx=sf, fy=sf) for sf in scales]
-            except cv2.error as e:
-                continue
+            scales = np.arange(1.0, 1.6, 0.1)
 
             best_scale, best_scale_score = 0, np.Inf
 
-            for idx in range(len(scales)):
-                template = scaled_templates[idx]
-                result = cv2.matchTemplate(template, current_temp, method=cv2.TM_SQDIFF_NORMED )
+            for scale in scales:
+                needle_template = cv2.resize(prev_temp, dsize=(0, 0), fx=scale, fy=scale)
+
+                new_w = max(scale * w, needle_template.shape[1])
+                new_h = max(scale * h, needle_template.shape[0])
+                x_min = max(0, int(x - new_w / 2))
+                x_max = int(x_min + new_w)
+                y_min = max(0, int(y - new_h / 2))
+                y_max = int(y_min + new_h)
+                haystack_template = new_img.grey[y_min:y_max, x_min:x_max]
+
+                result = cv2.matchTemplate(needle_template, haystack_template, method=cv2.TM_SQDIFF_NORMED )
                 score, _, _, _ = cv2.minMaxLoc(result)
+                score *= scale ** (-2)
+
+                if scale == 1.0:
+                    control_score = score
 
                 if score < best_scale_score:
                     best_scale_score = score
-                    best_scale = scales[idx]
+                    best_scale = scale
 
-            if best_scale > scale_threshold:
+            if best_scale > scale_threshold and best_scale_score < 0.8 * control_score:
                 obstacles["centroids"].append((x, y))
-                obstacles["dims"].append((w, h))
+                obstacles["dims"].append((width, height))
 
         return obstacles
 
@@ -240,7 +250,7 @@ class CollisionDetector:
 
             # get bool array stating which points are estimated to be in the foreground
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.7)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.2)
             old_kp = matched_new_kp
 
 
