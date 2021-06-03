@@ -13,7 +13,7 @@ class Image:
         self.xmargin = int( Image.margin_sf * self.w )
         self.ymargin = int( Image.margin_sf * self.h )
 
-        self.min_contour_area = 0.01 * self.h
+        self.min_contour_area = 0.2 * self.h
         self.centre = (int(self.w / 2), int(self.h / 2))
 
         self.cropped = self.original[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin]
@@ -76,10 +76,13 @@ class Image:
 
 
 
-    def show(self, title="Image", vid_writer=None):
+    def show(self, title="Image", vid_writer=None, isColor=True):
 
         if vid_writer is not None:
-            vid_writer.write(self.original)
+            if isColor:
+                vid_writer.write(self.original)
+            else:
+                vid_writer.write(self.grey)
         else:
             cv2.imshow(title, self.original)
             cv2.waitKey(1)

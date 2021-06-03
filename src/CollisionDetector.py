@@ -19,7 +19,7 @@ class CollisionDetector:
         self.frame_count = 0
 
 
-    def setup_vid_writer(self, img):
+    def setup_vid_writer(self, img, isColor=True):
 
         if cv2.__version__[0] == "3":
             codec, extn = 'MPEG', "avi"
@@ -32,12 +32,18 @@ class CollisionDetector:
         if not os.path.isdir("videos"):
             os.mkdir("videos")
 
-        filename = os.path.join(os.getcwd(), "videos", "output." + extn)
+        if isColor:
+            img_type = "colour"
+            h, w = img.original.shape[:2]
+        else:
+            img_type = "grey"
+            h, w = img.grey.shape[:2]
+
+        filename = os.path.join(os.getcwd(), "videos", "output_" + img_type + "." + extn)
         print("Writing output to {}".format(filename))
 
-        h, w = img.original.shape[:2]
         fourcc = cv2.VideoWriter_fourcc(*codec)
-        self.vid_writer = cv2.VideoWriter(filename, fourcc, 30, (w, h), isColor=True)
+        return cv2.VideoWriter(filename, fourcc, 30, (w, h), isColor=isColor)
 
 
     def filter_cluster(self, data, m = 2.):
@@ -162,7 +168,7 @@ class CollisionDetector:
         # return bool array to show which points moved further than given threshold
         if self.frame_count % 10 == 0:
             print("Average distance moved: {:.3f}, max moved: {:.3f}".format(np.average(distances), max(distances)))
-        return distances > np.array(20, dtype=np.float32) # np.median(distances)
+        return distances > np.array(10, dtype=np.float32) # np.median(distances)
 
 
     def proximity_estimation(self, cluster_info, old_img, new_img, scale_threshold):
@@ -226,7 +232,8 @@ class CollisionDetector:
         new_img = Image(frame, self.bgs)
 
         if self.old_img is None:
-            self.setup_vid_writer(new_img)
+            self.vid_writer_color = self.setup_vid_writer(new_img, isColor=True)
+            self.vid_writer_grey = self.setup_vid_writer(new_img, isColor=False)
             self.old_img = new_img
             self.old_kp, self.cluster_info = self.get_new_keypoints(new_img)
             self.frame_count += 1
@@ -262,7 +269,8 @@ class CollisionDetector:
             fg = None
 
         new_img.add_features(obstacles, old_kp, fg)
-        new_img.show(vid_writer=self.vid_writer)
+        new_img.show(vid_writer=self.vid_writer_color, isColor=True)
+        new_img.show(vid_writer=self.vid_writer_grey, isColor=False)
 
         if self.frame_count % 10 == 0:
             time_taken = time.time() - t0
@@ -311,8 +319,8 @@ class CollisionDetector:
                 obstacles = None
                 fg = None
 
-            new_img.add_features(obstacles, old_kp, fg)
-            new_img.show(vid_writer=self.vid_writer)
+            # new_img.add_features(obstacles, old_kp, fg)
+            new_img.show(vid_writer=self.vid_writer, isColor=True)
 
             old_img = new_img
             # old_kp = matched_new_kp
