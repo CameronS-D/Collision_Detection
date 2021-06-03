@@ -14,6 +14,7 @@ class Image:
         self.ymargin = int( Image.margin_sf * self.h )
 
         self.min_contour_area = 0.2 * self.h
+        self.max_contour_area = 0.01 * self.w * self.h
         self.centre = (int(self.w / 2), int(self.h / 2))
 
         self.cropped = self.original[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin]
@@ -30,7 +31,7 @@ class Image:
             contours, _ = cv2.findContours(fgMask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         # eliminate small contours
-        contours = [cnt for cnt in contours if cv2.contourArea(cnt) > self.min_contour_area]
+        contours = [cnt for cnt in contours if self.max_contour_area > cv2.contourArea(cnt) > self.min_contour_area]
 
         # add contours to grey image
         x, y = self.cropped.shape[:2]

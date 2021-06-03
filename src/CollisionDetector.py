@@ -14,7 +14,7 @@ class CollisionDetector:
         varThreshold is used like a confidence level when decideing if a pixel is part of the background
         varThreshold = 16 is default, value too high means objects arent detected, value too low increase CPU cost by a lot
         '''
-        self.bgs = cv2.createBackgroundSubtractorMOG2(history=20, varThreshold=12, detectShadows=False)
+        self.bgs = cv2.createBackgroundSubtractorMOG2(history=10, varThreshold=12, detectShadows=False)
         self.old_img, self.old_kp, self.cluster_info = None, None, None
         self.frame_count = 0
 
