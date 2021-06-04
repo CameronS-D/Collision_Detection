@@ -184,8 +184,8 @@ class CollisionDetector:
         for (x, y), (width, height) in zip(centroids, dims):
             if width * height < 2500:
                 continue
-            w = width * 1.2/9
-            h = height * 1.2/9
+            w = width * 1.2/9 * 20
+            h = height * 1.2/9 * 20
             x_min = max(0, int(x - w / 2))
             x_max = int(x_min + w)
             y_min = max(0, int(y - h / 2))
@@ -200,12 +200,12 @@ class CollisionDetector:
             for scale in scales:
                 needle_template = cv2.resize(prev_temp, dsize=(0, 0), fx=scale, fy=scale)
 
-                new_w = max(scale * w, needle_template.shape[1])
-                new_h = max(scale * h, needle_template.shape[0])
+                new_h, new_w = needle_template.shape[:2]
                 x_min = max(0, int(x - new_w / 2))
-                x_max = int(x_min + new_w)
+                x_max = int(x + new_w / 2)
                 y_min = max(0, int(y - new_h / 2))
-                y_max = int(y_min + new_h)
+                y_max = int(y + new_h / 2)
+
                 haystack_template = new_img.grey[y_min:y_max, x_min:x_max]
 
                 result = cv2.matchTemplate(needle_template, haystack_template, method=cv2.TM_SQDIFF_NORMED )
