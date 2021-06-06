@@ -227,6 +227,67 @@ class CollisionDetector:
 
         return obstacles
 
+    def check_for_empty_space(self, arr, w, h):
+
+        sub_w = w // 2
+        sub_h = h // 2
+
+        points = []
+
+        if sub_w < 50 or sub_h < 50:
+            return points
+
+        img_h, img_w = self.old_img.grey.shape[:2]
+
+        for i in range(img_h // sub_h):
+            for j in range(img_w // sub_w):
+                sub_sec = arr[i*sub_h:(i+1)*sub_h, j*sub_w:(j+1)*sub_w]
+
+                if 1 not in sub_sec:
+                    points.append(np.array([i*sub_h + sub_h // 2, j*sub_w + sub_w // 2]))
+
+        if len(points) == 0:
+            points += self.check_for_empty_space(sub_sec, sub_w, sub_h)
+
+        return points
+
+
+    def get_safe_point(self, obstacles):
+
+        if len(obstacles["centroids"]) == 0:
+            return None
+
+        img_h, img_w = self.old_img.grey.shape[:2]
+
+        if self.frame_count % 30 == 0:
+            # Only reset heatmap every few frames -> this way objects that are only captured briefly are remembered
+            self.heatmap = np.zeros(shape=(img_h, img_w))
+
+        centroids = obstacles["centroids"]
+        dims = obstacles["dims"]
+
+        for (x, y), (w, h) in zip(centroids, dims):
+            w *= 1.2
+            h *= 1.2
+            x_min = max(0, int(x - w / 2))
+            x_max = int(x_min + w)
+            y_min = max(0, int(y - h / 2))
+            y_max = int(y_min + h)
+
+            self.heatmap[y_min:y_max, x_min:x_max] = 1
+
+        safepoints = np.array(self.check_for_empty_space(self.heatmap, img_w, img_h))
+
+        if len(safepoints) > 0:
+            ctr_x = (img_w-1) // 2
+            ctr_y = (img_h-1) // 2
+            dists = np.sum((safepoints - np.array([ctr_y, ctr_x])) ** 2, axis=1   )
+
+            closest_pnt_idx = np.argmin(dists)
+            y, x = safepoints[closest_pnt_idx]
+            return (x, y)
+        return None
+
 
     def process_frame(self, frame):
 
@@ -239,6 +300,8 @@ class CollisionDetector:
             self.vid_writer_grey = self.setup_vid_writer(new_img, isColor=False)
             self.old_img = new_img
             self.old_kp, self.cluster_info = self.get_new_keypoints(new_img)
+            img_h, img_w = self.old_img.grey.shape[:2]
+            self.heatmap = np.zeros(shape=(img_h, img_w))
             self.frame_count += 1
             return
 
@@ -264,17 +327,18 @@ class CollisionDetector:
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
             obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.2)
             old_kp = matched_new_kp
-
+            safe_pnt = self.get_safe_point(obstacles)
 
         else:
             old_kp, cluster_info = self.get_new_keypoints(new_img)
             obstacles = None
             fg = None
+            safe_pnt = None
 
-        new_img.add_features(obstacles, old_kp, fg)
-        new_img.show(vid_writer=self.vid_writer_color, isColor=True)
-        new_img.show(vid_writer=self.vid_writer_grey, isColor=False)
-        # new_img.show()
+        new_img.add_features(obstacles, old_kp, fg, safe_pnt)
+        # new_img.show(vid_writer=self.vid_writer_color, isColor=True)
+        # new_img.show(vid_writer=self.vid_writer_grey, isColor=False)
+        new_img.show()
 
         if self.frame_count % 10 == 0:
             time_taken = time.time() - t0

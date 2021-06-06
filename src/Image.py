@@ -7,9 +7,9 @@ class Image:
 
     def __init__(self, img, bgs):
         # resize image to lower resolution to reduce computation cost
-        self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
-        # self.original = cv2.resize(img, dsize=(960, 720))
-        # self.original = cv2.resize(self.original, dsize=(0, 0), fx=0.5, fy=0.5)
+        # self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
+        self.original = cv2.resize(img, dsize=(960, 720))
+        self.original = cv2.resize(self.original, dsize=(0, 0), fx=0.5, fy=0.5)
         self.bgs = bgs
 
         self.h, self.w = self.original.shape[:2]
@@ -43,7 +43,7 @@ class Image:
 
         return tempImg
 
-    def add_features(self, obstacles=None, keypoints=None, is_foreground=None):
+    def add_features(self, obstacles=None, keypoints=None, is_foreground=None, safe_point=None):
 
         # add obstacles
         # colours in BGR
@@ -75,8 +75,11 @@ class Image:
 
                 cv2.circle(self.original, centre, radius=2, color=colour, thickness=-1)
 
-
-        cv2.circle(self.original, self.centre, radius=6, color=(0, 255, 0), thickness=1)
+        if safe_point is not None:
+            x, y = safe_point
+            x += self.xmargin
+            y += self.ymargin
+            cv2.circle(self.original, (x, y), radius=25, color=(0, 255, 0), thickness=1)
 
 
 
