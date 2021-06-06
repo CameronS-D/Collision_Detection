@@ -234,7 +234,7 @@ class CollisionDetector:
 
         points = []
 
-        if sub_w < 50 or sub_h < 50:
+        if sub_w < 25 or sub_h < 25:
             return points
 
         img_h, img_w = self.old_img.grey.shape[:2]
@@ -247,7 +247,7 @@ class CollisionDetector:
                     points.append(np.array([i*sub_h + sub_h // 2, j*sub_w + sub_w // 2]))
 
         if len(points) == 0:
-            points += self.check_for_empty_space(sub_sec, sub_w, sub_h)
+            points += self.check_for_empty_space(arr, sub_w, sub_h)
 
         return points
 
@@ -259,7 +259,7 @@ class CollisionDetector:
 
         img_h, img_w = self.old_img.grey.shape[:2]
 
-        if self.frame_count % 30 == 0:
+        if self.frame_count % 15 == 0:
             # Only reset heatmap every few frames -> this way objects that are only captured briefly are remembered
             self.heatmap = np.zeros(shape=(img_h, img_w))
 
