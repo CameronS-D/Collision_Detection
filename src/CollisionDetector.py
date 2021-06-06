@@ -57,7 +57,7 @@ class CollisionDetector:
         return data[std_devs < m].reshape((-1, 1, 2))
 
 
-    def cluster_keypoints(self, keypoints, n_clusters=4):
+    def cluster_keypoints(self, keypoints, n_clusters=3):
 
         cluster_info = {
             "centroids": [],
@@ -169,7 +169,7 @@ class CollisionDetector:
         # return bool array to show which points moved further than given threshold
         if self.frame_count % 10 == 0:
             print("Average distance moved: {:.3f}, max moved: {:.3f}".format(np.average(distances), max(distances)))
-        return distances > np.array(10, dtype=np.float32) # np.median(distances)
+        return distances > np.array(20, dtype=np.float32) # np.median(distances)
 
 
     def proximity_estimation(self, cluster_info, old_img, new_img, scale_threshold):
@@ -182,7 +182,7 @@ class CollisionDetector:
         dims = cluster_info["dims"]
 
         for (x, y), (width, height) in zip(centroids, dims):
-            if width * height < 2500:
+            if width * height < 1000:
                 continue
             w = width * 1.2/9 * 20
             h = height * 1.2/9 * 20
@@ -194,6 +194,7 @@ class CollisionDetector:
             prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
 
             scales = np.arange(1.0, 1.6, 0.1)
+            scales = [1.0, 1.3, 1.5, 1.7, 1.9]
 
             best_scale, best_scale_score = 0, np.Inf
 
@@ -207,10 +208,11 @@ class CollisionDetector:
                 y_max = int(y + new_h / 2)
 
                 haystack_template = new_img.grey[y_min:y_max, x_min:x_max]
-
-                result = cv2.matchTemplate(needle_template, haystack_template, method=cv2.TM_SQDIFF_NORMED )
-                score, _, _, _ = cv2.minMaxLoc(result)
-                score *= scale ** (-2)
+                haystack_template = cv2.resize(haystack_template, dsize=(new_w, new_h), interpolation=cv2.INTER_AREA)
+                # result = cv2.matchTemplate(needle_template, haystack_template, method=cv2.TM_SQDIFF_NORMED )
+                # score, _, _, _ = cv2.minMaxLoc(result)
+                # score *= scale ** (-2)
+                score = ((haystack_template - needle_template) ** 2).mean(axis=None)
 
                 if scale == 1.0:
                     control_score = score
@@ -219,7 +221,7 @@ class CollisionDetector:
                     best_scale_score = score
                     best_scale = scale
 
-            if best_scale > scale_threshold and best_scale_score < 0.75 * control_score:
+            if best_scale > scale_threshold and best_scale_score < 0.8 * control_score:
                 obstacles["centroids"].append((x, y))
                 obstacles["dims"].append((width, height))
 
@@ -260,7 +262,7 @@ class CollisionDetector:
 
             # get bool array stating which points are estimated to be in the foreground
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.4)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.2)
             old_kp = matched_new_kp
 
 
@@ -272,6 +274,7 @@ class CollisionDetector:
         new_img.add_features(obstacles, old_kp, fg)
         new_img.show(vid_writer=self.vid_writer_color, isColor=True)
         new_img.show(vid_writer=self.vid_writer_grey, isColor=False)
+        # new_img.show()
 
         if self.frame_count % 10 == 0:
             time_taken = time.time() - t0
@@ -282,70 +285,14 @@ class CollisionDetector:
         self.frame_count += 1
 
 
-    def run(self):
-        # Now obsolete
-
-        count = 0
-        t0 = time.time()
-
-        success, img = self.vidstream.read()
-
-        old_img = Image(img, self.bgs)
-        # get first keypoints
-        old_kp, cluster_info = self.get_new_keypoints(old_img)
-
-        while(True):
-            success, img = self.vidstream.read()
-            if not success:
-                print("\nVideo complete. Output written to output.mp4 or output.avi")
-                break
-            new_img = Image(img, self.bgs)
-
-            if len(old_kp) != 0:
-                new_kp, status, err = cv2.calcOpticalFlowPyrLK(old_img.grey, new_img.grey, old_kp, None, maxLevel=3)
-                # select points that were matched by OF in new frame
-                matched_new_kp = new_kp[status==1]
-                matched_old_kp = old_kp[status==1]
-                # reshape for use with other functions
-                matched_new_kp = matched_new_kp.reshape((-1, 1, 2))
-                matched_old_kp = matched_old_kp.reshape((-1, 1, 2))
-
-                # get bool array stating which points are estimated to be in the foreground
-                fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-                obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=3.3)
-                old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
-
-            else:
-                old_kp, cluster_info = self.get_new_keypoints(new_img)
-                obstacles = None
-                fg = None
-
-            # new_img.add_features(obstacles, old_kp, fg)
-            new_img.show(vid_writer=self.vid_writer, isColor=True)
-
-            old_img = new_img
-            # old_kp = matched_new_kp
-
-            if count % 30 == 0:
-                '''
-                Periodically search for new features of interest,
-                otherwise only points that were seen at the start will ever be detected
-                '''
-                # old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=matched_new_kp)
-                # for testing purposes
-                t1 = time.time()
-                time_taken = t1 - t0
-                vid_time = count / 30
-                error = time_taken - vid_time
-                print("Frame: {} Actual time: {:.1f} Vid time: {} Lag: {:.1f} secs".format(count, time_taken, vid_time, error))
-
-            count += 1
-
-
 if __name__ == "__main__":
     CD = CollisionDetector()
-    # CD.run()
-    vidstream = cv2.VideoCapture("../videos/beach_with_trees.mp4")
+    # vidstream = cv2.VideoCapture("../videos/beach_with_trees.mp4")
+    vidstream = cv2.VideoCapture(0)
+
+    if not vidstream.isOpened():
+        raise Exception
+
     while True:
         success, img = vidstream.read()
         if not success:

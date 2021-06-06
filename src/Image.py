@@ -3,19 +3,21 @@ import cv2
 import numpy as np
 
 class Image:
-    margin_sf = 0.2
+    margin_sf = 0.1
 
     def __init__(self, img, bgs):
         # resize image to lower resolution to reduce computation cost
         self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
+        # self.original = cv2.resize(img, dsize=(960, 720))
+        # self.original = cv2.resize(self.original, dsize=(0, 0), fx=0.5, fy=0.5)
         self.bgs = bgs
 
         self.h, self.w = self.original.shape[:2]
         self.xmargin = int( Image.margin_sf * self.w )
         self.ymargin = int( Image.margin_sf * self.h )
 
-        self.min_contour_area = 0.2 * self.h
-        self.max_contour_area = 0.01 * self.w * self.h
+        self.min_contour_area = 0.1 * self.h
+        self.max_contour_area = 0.1 * self.w * self.h
         self.centre = (int(self.w / 2), int(self.h / 2))
 
         self.cropped = self.original[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin]
