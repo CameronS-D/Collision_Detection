@@ -191,7 +191,7 @@ class CollisionDetector:
             y_min = max(0, int(y - h / 2))
             y_max = int(y_min + h)
 
-            prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
+            prev_temp = old_img.grey_full[y_min:y_max, x_min:x_max]
 
             scales = np.arange(1.0, 1.6, 0.1)
             scales = [1.0, 1.3, 1.5, 1.7, 1.9]
@@ -207,7 +207,7 @@ class CollisionDetector:
                 y_min = max(0, int(y - new_h / 2))
                 y_max = int(y + new_h / 2)
 
-                haystack_template = new_img.grey[y_min:y_max, x_min:x_max]
+                haystack_template = new_img.grey_full[y_min:y_max, x_min:x_max]
                 haystack_template = cv2.resize(haystack_template, dsize=(new_w, new_h), interpolation=cv2.INTER_AREA)
                 # result = cv2.matchTemplate(needle_template, haystack_template, method=cv2.TM_SQDIFF_NORMED )
                 # score, _, _, _ = cv2.minMaxLoc(result)
@@ -325,7 +325,7 @@ class CollisionDetector:
 
             # get bool array stating which points are estimated to be in the foreground
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.2)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.4)
             old_kp = matched_new_kp
             safe_pnt = self.get_safe_point(obstacles)
 
@@ -351,8 +351,8 @@ class CollisionDetector:
 
 if __name__ == "__main__":
     CD = CollisionDetector()
-    # vidstream = cv2.VideoCapture("../videos/beach_with_trees.mp4")
-    vidstream = cv2.VideoCapture(0)
+    # vidstream = cv2.VideoCapture(0)
+    vidstream = cv2.VideoCapture("../videos/test_vid.avi")
 
     if not vidstream.isOpened():
         raise Exception

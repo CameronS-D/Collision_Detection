@@ -22,11 +22,12 @@ class Image:
 
         self.cropped = self.original[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin]
         self.grey = self.get_grey_contour_img()
+        self.grey_full = cv2.cvtColor(self.cropped, cv2.COLOR_BGR2GRAY)
 
     def get_grey_contour_img(self):
 
         # get foreground mask from image and find contours in it
-        fgMask = self.bgs.apply(self.cropped, learningRate=0.1)
+        fgMask = self.bgs.apply(self.cropped, learningRate=0.80)
 
         if cv2.__version__[0] == "3":
             _, contours, _ = cv2.findContours(fgMask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
