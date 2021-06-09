@@ -20,7 +20,7 @@ class CollisionDetector:
         self.frame_count = 0
 
 
-    def setup_vid_writer(self, img, isColor=True):
+    def setup_vid_writer(self, img, name="", isColor=True):
 
         if cv2.__version__[0] == "3":
             codec, extn = 'MPEG', "avi"
@@ -34,20 +34,18 @@ class CollisionDetector:
             os.mkdir("videos")
 
         if isColor:
-            img_type = "colour"
             h, w = img.original.shape[:2]
         else:
-            img_type = "grey"
-            h, w = img.grey.shape[:2]
+            h, w = img.contour.shape[:2]
 
-        filename = os.path.join(os.getcwd(), "videos", "output_" + img_type + "." + extn)
+        filename = os.path.join(os.getcwd(), "videos", "output_" + name + "." + extn)
         print("Writing output to {}".format(filename))
 
         fourcc = cv2.VideoWriter_fourcc(*codec)
         return cv2.VideoWriter(filename, fourcc, 30, (w, h), isColor=isColor)
 
 
-    def filter_cluster(self, data, m = 2.):
+    def filter_cluster(self, data, m = 1.8):
         d = np.abs(data - np.median(data))
         mdev = np.median(d, axis=0)
         s = d/mdev
@@ -57,7 +55,7 @@ class CollisionDetector:
         return data[std_devs < m].reshape((-1, 1, 2))
 
 
-    def cluster_keypoints(self, keypoints, n_clusters=3):
+    def cluster_keypoints(self, keypoints, n_clusters=2):
 
         cluster_info = {
             "centroids": [],
@@ -138,11 +136,11 @@ class CollisionDetector:
                     list of keypoints that were tracked by OF on the last iteration
         '''
 
-        # Get new keypoints directly from grey img
-        keypoints = cv2.goodFeaturesToTrack(img.grey, maxCorners=1500, qualityLevel=0.1, minDistance=10)
+        # Get new keypoints directly from contour img
+        keypoints = cv2.goodFeaturesToTrack(img.contour, maxCorners=1500, qualityLevel=0.5, minDistance=10)
 
         if keypoints is not None and len(keypoints) > 3:
-            keypoints = keypoints[::3, :, :]
+            keypoints = keypoints[::2, :, :]
 
         if old_kp is not None:
             try:
@@ -167,8 +165,6 @@ class CollisionDetector:
         distances = [np.linalg.norm(p1 - p0) for p0, p1 in zip(kp_prev, kp_current)]
 
         # return bool array to show which points moved further than given threshold
-        if self.frame_count % 10 == 0:
-            print("Average distance moved: {:.3f}, max moved: {:.3f}".format(np.average(distances), max(distances)))
         return distances > np.array(20, dtype=np.float32) # np.median(distances)
 
 
@@ -191,27 +187,28 @@ class CollisionDetector:
             y_min = max(0, int(y - h / 2))
             y_max = int(y_min + h)
 
-            prev_temp = old_img.grey_full[y_min:y_max, x_min:x_max]
+            prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
 
-            scales = np.arange(1.0, 1.6, 0.1)
             scales = [1.0, 1.3, 1.5, 1.7, 1.9]
-
             best_scale, best_scale_score = 0, np.Inf
 
             for scale in scales:
-                needle_template = cv2.resize(prev_temp, dsize=(0, 0), fx=scale, fy=scale)
+                new_h = int(prev_temp.shape[0]*scale)
+                new_w = int(prev_temp.shape[1]*scale)
 
-                new_h, new_w = needle_template.shape[:2]
+                needle_template = cv2.resize(prev_temp, dsize=(new_w, new_h))
+
                 x_min = max(0, int(x - new_w / 2))
                 x_max = int(x + new_w / 2)
                 y_min = max(0, int(y - new_h / 2))
                 y_max = int(y + new_h / 2)
 
-                haystack_template = new_img.grey_full[y_min:y_max, x_min:x_max]
+                haystack_template = new_img.grey[y_min:y_max, x_min:x_max]
                 haystack_template = cv2.resize(haystack_template, dsize=(new_w, new_h), interpolation=cv2.INTER_AREA)
                 # result = cv2.matchTemplate(needle_template, haystack_template, method=cv2.TM_SQDIFF_NORMED )
                 # score, _, _, _ = cv2.minMaxLoc(result)
                 # score *= scale ** (-2)
+
                 score = ((haystack_template - needle_template) ** 2).mean(axis=None)
 
                 if scale == 1.0:
@@ -221,7 +218,7 @@ class CollisionDetector:
                     best_scale_score = score
                     best_scale = scale
 
-            if best_scale > scale_threshold and best_scale_score < 0.8 * control_score:
+            if best_scale > scale_threshold and best_scale_score < 0.75 * control_score:
                 obstacles["centroids"].append((x, y))
                 obstacles["dims"].append((width, height))
 
@@ -237,7 +234,7 @@ class CollisionDetector:
         if sub_w < 25 or sub_h < 25:
             return points
 
-        img_h, img_w = self.old_img.grey.shape[:2]
+        img_h, img_w = self.old_img.contour.shape[:2]
 
         for i in range(img_h // sub_h):
             for j in range(img_w // sub_w):
@@ -257,7 +254,7 @@ class CollisionDetector:
         if len(obstacles["centroids"]) == 0:
             return None
 
-        img_h, img_w = self.old_img.grey.shape[:2]
+        img_h, img_w = self.old_img.contour.shape[:2]
 
         if self.frame_count % 15 == 0:
             # Only reset heatmap every few frames -> this way objects that are only captured briefly are remembered
@@ -296,25 +293,27 @@ class CollisionDetector:
         new_img = Image(frame, self.bgs)
 
         if self.old_img is None:
-            self.vid_writer_color = self.setup_vid_writer(new_img, isColor=True)
-            self.vid_writer_grey = self.setup_vid_writer(new_img, isColor=False)
+            self.vid_writer_color = self.setup_vid_writer(new_img, name="colour", isColor=True)
+            self.vid_writer_contour = self.setup_vid_writer(new_img, name="contour", isColor=False)
+            self.vid_writer_blank = self.setup_vid_writer(new_img, name="blank", isColor=True)
+
             self.old_img = new_img
             self.old_kp, self.cluster_info = self.get_new_keypoints(new_img)
-            img_h, img_w = self.old_img.grey.shape[:2]
+            img_h, img_w = self.old_img.contour.shape[:2]
             self.heatmap = np.zeros(shape=(img_h, img_w))
             self.frame_count += 1
             return
 
         old_img, old_kp, cluster_info = self.old_img, self.old_kp, self.cluster_info
 
-        if self.frame_count % 30 == 0:
+        if self.frame_count % 15 == 0:
                 old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=old_kp)
         else:
             old_kp, cluster_info = self.cluster_keypoints(old_kp)
 
         if len(old_kp) != 0:
 
-            new_kp, status, err = cv2.calcOpticalFlowPyrLK(old_img.grey, new_img.grey, old_kp, None, maxLevel=3)
+            new_kp, status, err = cv2.calcOpticalFlowPyrLK(old_img.contour, new_img.contour, old_kp, None, maxLevel=3)
 
             # select points that were matched by OF in new frame
             matched_new_kp = new_kp[status==1]
@@ -325,7 +324,7 @@ class CollisionDetector:
 
             # get bool array stating which points are estimated to be in the foreground
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.4)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.2)
             old_kp = matched_new_kp
             safe_pnt = self.get_safe_point(obstacles)
 
@@ -335,9 +334,13 @@ class CollisionDetector:
             fg = None
             safe_pnt = None
 
+
+        new_img.show(vid_writer=self.vid_writer_blank, isColor=True)
+
         new_img.add_features(obstacles, old_kp, fg, safe_pnt)
-        # new_img.show(vid_writer=self.vid_writer_color, isColor=True)
-        # new_img.show(vid_writer=self.vid_writer_grey, isColor=False)
+
+        new_img.show(vid_writer=self.vid_writer_color, isColor=True)
+        new_img.show(vid_writer=self.vid_writer_contour, isColor=False)
         new_img.show()
 
         if self.frame_count % 10 == 0:
@@ -351,15 +354,15 @@ class CollisionDetector:
 
 if __name__ == "__main__":
     CD = CollisionDetector()
-    # vidstream = cv2.VideoCapture(0)
-    vidstream = cv2.VideoCapture("../videos/test_vid.avi")
+    vidstream = cv2.VideoCapture(0)
+    # vidstream = cv2.VideoCapture("../videos/output_blank.avi")
 
     if not vidstream.isOpened():
-        raise Exception
+        raise Exception("Video stream would not open. ")
 
     while True:
         success, img = vidstream.read()
         if not success:
-            print("\nVideo complete. Output written to output.mp4 or output.avi")
+            print("\nVideo complete.")
             break
         CD.process_frame(img)

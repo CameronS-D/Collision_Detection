@@ -7,9 +7,9 @@ class Image:
 
     def __init__(self, img, bgs):
         # resize image to lower resolution to reduce computation cost
-        # self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
-        self.original = cv2.resize(img, dsize=(960, 720))
-        self.original = cv2.resize(self.original, dsize=(0, 0), fx=0.5, fy=0.5)
+        self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
+        # self.original = cv2.resize(img, dsize=(960, 720))
+        # self.original = cv2.resize(self.original, dsize=(0, 0), fx=0.5, fy=0.5)
         self.bgs = bgs
 
         self.h, self.w = self.original.shape[:2]
@@ -21,13 +21,13 @@ class Image:
         self.centre = (int(self.w / 2), int(self.h / 2))
 
         self.cropped = self.original[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin]
-        self.grey = self.get_grey_contour_img()
-        self.grey_full = cv2.cvtColor(self.cropped, cv2.COLOR_BGR2GRAY)
+        self.contour = self.get_contour_img()
+        self.grey = cv2.cvtColor(self.cropped, cv2.COLOR_BGR2GRAY)
 
-    def get_grey_contour_img(self):
+    def get_contour_img(self):
 
         # get foreground mask from image and find contours in it
-        fgMask = self.bgs.apply(self.cropped, learningRate=0.80)
+        fgMask = self.bgs.apply(self.cropped, learningRate=0.1)
 
         if cv2.__version__[0] == "3":
             _, contours, _ = cv2.findContours(fgMask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -38,8 +38,8 @@ class Image:
         contours = [cnt for cnt in contours if self.max_contour_area > cv2.contourArea(cnt) > self.min_contour_area]
 
         # add contours to grey image
-        x, y = self.cropped.shape[:2]
-        tempImg = np.zeros((x, y, 1), np.uint8)
+        h, w = self.cropped.shape[:2]
+        tempImg = np.zeros((h, w, 1), np.uint8)
         cv2.drawContours(tempImg, contours, -1, 255, -1)
 
         return tempImg
@@ -90,7 +90,7 @@ class Image:
             if isColor:
                 vid_writer.write(self.original)
             else:
-                vid_writer.write(self.grey)
+                vid_writer.write(self.contour)
         else:
             cv2.imshow(title, self.original)
             cv2.waitKey(1)
