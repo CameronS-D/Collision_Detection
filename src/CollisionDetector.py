@@ -189,7 +189,7 @@ class CollisionDetector:
 
             prev_temp = old_img.grey[y_min:y_max, x_min:x_max]
 
-            scales = [1.0, 1.3, 1.5, 1.7, 1.9]
+            scales = [0.9, 1.0, 1.3, 1.5, 1.7, 1.9]
             best_scale, best_scale_score = 0, np.Inf
 
             for scale in scales:
