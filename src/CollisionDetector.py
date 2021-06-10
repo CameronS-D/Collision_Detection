@@ -46,11 +46,14 @@ class CollisionDetector:
 
 
     def filter_cluster(self, data, m = 1.8):
-        d = np.abs(data - np.median(data))
-        mdev = np.median(d, axis=0)
-        s = d/mdev
+
+        deviation = np.abs(data - np.median(data))
+        med_dev = np.median(deviation, axis=0)
+
+        s = deviation / med_dev
         std_devs = np.linalg.norm(s, axis=2)
         np.nan_to_num(std_devs, copy=False)
+
         m *= 2 ** 0.5
         return data[std_devs < m].reshape((-1, 1, 2))
 
@@ -71,20 +74,15 @@ class CollisionDetector:
         agglo.fit(kp_data)
 
         all_clusters = [ [] for _ in range(n_clusters) ]
+
         for kp, cluster_num in zip(keypoints, agglo.labels_):
             all_clusters[cluster_num].append(kp)
 
-        for cluster in all_clusters[:]:
-            try:
-                cl = self.filter_cluster(np.array(cluster))
-                xmax, ymax = cl.max(axis=0)[0]
-                xmin, ymin = cl.min(axis=0)[0]
-            except ValueError:
-                print("Removing cluster of length ", len(cluster))
-                all_clusters.remove(cluster)
-                print("Tracking", len(all_clusters), "clusters")
-                continue
+        for cluster in all_clusters:
 
+            cl = self.filter_cluster(np.array(cluster))
+            xmax, ymax = cl.max(axis=0)[0]
+            xmin, ymin = cl.min(axis=0)[0]
 
             w = int(xmax - xmin)
             h = int(ymax - ymin)
@@ -354,8 +352,8 @@ class CollisionDetector:
 
 if __name__ == "__main__":
     CD = CollisionDetector()
-    vidstream = cv2.VideoCapture(0)
-    # vidstream = cv2.VideoCapture("../videos/output_blank.avi")
+    # vidstream = cv2.VideoCapture(0)
+    vidstream = cv2.VideoCapture("../videos/beach_with_trees.mp4")
 
     if not vidstream.isOpened():
         raise Exception("Video stream would not open. ")
