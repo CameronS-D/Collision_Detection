@@ -7,6 +7,7 @@ class Image:
 
     def __init__(self, img, bgs):
         # resize image to lower resolution to reduce computation cost
+        # self.original = img
         self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
         # self.original = cv2.resize(img, dsize=(960, 720))
         # self.original = cv2.resize(self.original, dsize=(0, 0), fx=0.5, fy=0.5)

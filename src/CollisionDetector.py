@@ -291,7 +291,7 @@ class CollisionDetector:
         new_img = Image(frame, self.bgs)
 
         if self.old_img is None:
-            self.vid_writer_color = self.setup_vid_writer(new_img, name="colour", isColor=True)
+            self.vid_writer_color = self.setup_vid_writer(new_img, name="colour2", isColor=True)
             self.vid_writer_contour = self.setup_vid_writer(new_img, name="contour", isColor=False)
             self.vid_writer_blank = self.setup_vid_writer(new_img, name="blank", isColor=True)
 
@@ -303,11 +303,6 @@ class CollisionDetector:
             return
 
         old_img, old_kp, cluster_info = self.old_img, self.old_kp, self.cluster_info
-
-        if self.frame_count % 15 == 0:
-                old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=old_kp)
-        else:
-            old_kp, cluster_info = self.cluster_keypoints(old_kp)
 
         if len(old_kp) != 0:
 
@@ -333,13 +328,20 @@ class CollisionDetector:
             safe_pnt = None
 
 
-        new_img.show(vid_writer=self.vid_writer_blank, isColor=True)
+        # new_img.show(vid_writer=self.vid_writer_blank, isColor=True)
 
         new_img.add_features(obstacles, old_kp, fg, safe_pnt)
 
         new_img.show(vid_writer=self.vid_writer_color, isColor=True)
-        new_img.show(vid_writer=self.vid_writer_contour, isColor=False)
+        # new_img.show(vid_writer=self.vid_writer_contour, isColor=False)
         new_img.show()
+
+
+        if self.frame_count % 15 == 0:
+                old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=old_kp)
+        else:
+            old_kp, cluster_info = self.cluster_keypoints(old_kp)
+
 
         if self.frame_count % 10 == 0:
             time_taken = time.time() - t0
@@ -353,7 +355,7 @@ class CollisionDetector:
 if __name__ == "__main__":
     CD = CollisionDetector()
     # vidstream = cv2.VideoCapture(0)
-    vidstream = cv2.VideoCapture("../videos/beach_with_trees.mp4")
+    vidstream = cv2.VideoCapture("../videos/output_blank.avi")
 
     if not vidstream.isOpened():
         raise Exception("Video stream would not open. ")
