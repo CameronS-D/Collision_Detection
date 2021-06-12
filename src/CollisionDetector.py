@@ -291,7 +291,7 @@ class CollisionDetector:
         new_img = Image(frame, self.bgs)
 
         if self.old_img is None:
-            self.vid_writer_color = self.setup_vid_writer(new_img, name="colour2", isColor=True)
+            self.vid_writer_color = self.setup_vid_writer(new_img, name="colour", isColor=True)
             self.vid_writer_contour = self.setup_vid_writer(new_img, name="contour", isColor=False)
             self.vid_writer_blank = self.setup_vid_writer(new_img, name="blank", isColor=True)
 
@@ -327,14 +327,17 @@ class CollisionDetector:
             fg = None
             safe_pnt = None
 
+        cv2.imwrite(f"./videos/Frames/mask_{self.frame_count}.jpg", new_img.fgMask)
+        cv2.imwrite(f"./videos/Frames/cropped_{self.frame_count}.jpg", new_img.cropped)
+        cv2.imwrite(f"./videos/Frames/contour_{self.frame_count}.jpg", new_img.contour)
 
         # new_img.show(vid_writer=self.vid_writer_blank, isColor=True)
 
         new_img.add_features(obstacles, old_kp, fg, safe_pnt)
 
-        new_img.show(vid_writer=self.vid_writer_color, isColor=True)
+        # new_img.show(vid_writer=self.vid_writer_color, isColor=True)
         # new_img.show(vid_writer=self.vid_writer_contour, isColor=False)
-        new_img.show()
+        # new_img.show()
 
 
         if self.frame_count % 15 == 0:
@@ -355,10 +358,13 @@ class CollisionDetector:
 if __name__ == "__main__":
     CD = CollisionDetector()
     # vidstream = cv2.VideoCapture(0)
-    vidstream = cv2.VideoCapture("../videos/output_blank.avi")
+    vidstream = cv2.VideoCapture("../videos/test_1_blank.avi")
 
     if not vidstream.isOpened():
         raise Exception("Video stream would not open. ")
+
+    for _ in range(3000):
+        vidstream.read()
 
     while True:
         success, img = vidstream.read()

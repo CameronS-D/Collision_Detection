@@ -1,14 +1,15 @@
 from __future__ import division
 import cv2
 import numpy as np
+import time
 
 class Image:
     margin_sf = 0.1
 
     def __init__(self, img, bgs):
         # resize image to lower resolution to reduce computation cost
-        # self.original = img
-        self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
+        self.original = img
+        # self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
         # self.original = cv2.resize(img, dsize=(960, 720))
         # self.original = cv2.resize(self.original, dsize=(0, 0), fx=0.5, fy=0.5)
         self.bgs = bgs
@@ -22,6 +23,7 @@ class Image:
         self.centre = (int(self.w / 2), int(self.h / 2))
 
         self.cropped = self.original[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin]
+
         self.contour = self.get_contour_img()
         self.grey = cv2.cvtColor(self.cropped, cv2.COLOR_BGR2GRAY)
 
@@ -29,6 +31,7 @@ class Image:
 
         # get foreground mask from image and find contours in it
         fgMask = self.bgs.apply(self.cropped, learningRate=0.1)
+        self.fgMask = fgMask
 
         if cv2.__version__[0] == "3":
             _, contours, _ = cv2.findContours(fgMask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)

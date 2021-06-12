@@ -24,8 +24,8 @@ class CollisionDetector:
         self.bgs = cv2.createBackgroundSubtractorMOG2(history=20, varThreshold=12, detectShadows=False)
 
         self.vidstream.read()
-        success, self.old_img = self.vidstream.read()
-
+        success, img = self.vidstream.read()
+        self.old_img = img
         # set margin so only objects near the centre of the screen are tracked/detected -> cuts computation time by a lot
         h, w = self.old_img.shape[:2]
         self.h, self.w = h, w
@@ -58,59 +58,60 @@ class CollisionDetector:
         return cv2.cvtColor(tempImg, cv2.COLOR_BGR2GRAY)
 
 
-    def cluster_keypoints(self, keypoints, n_clusters=8):
+    # def cluster_keypoints(self, keypoints, n_clusters=8):
 
-        keypoints = keypoints[::3, :, :]
+    #     keypoints = keypoints[::3, :, :]
 
-        if len(keypoints) < n_clusters:
-            return np.array(keypoints, dtype=np.float32), [np.array(keypoints, dtype=np.float32)]
+    #     if len(keypoints) < n_clusters:
+    #         return np.array(keypoints, dtype=np.float32), [np.array(keypoints, dtype=np.float32)]
 
-        kp_data = np.reshape(keypoints, (-1, 2)).T
+    #     kp_data = np.reshape(keypoints, (-1, 2)).T
 
-        agglo = FeatureAgglomeration(n_clusters=n_clusters)
-        agglo.fit(kp_data)
+    #     agglo = FeatureAgglomeration(n_clusters=n_clusters)
+    #     agglo.fit(kp_data)
 
-        all_clusters = [ [] for _ in range(n_clusters) ]
-        for kp, cluster_num in zip(keypoints, agglo.labels_):
-            all_clusters[cluster_num].append(kp)
+    #     all_clusters = [ [] for _ in range(n_clusters) ]
+    #     for kp, cluster_num in zip(keypoints, agglo.labels_):
+    #         all_clusters[cluster_num].append(kp)
 
-        # for idx, cluster in enumerate(all_clusters):
-        #     cluster = np.array(cluster, dtype=np.float32)
-        #     x_ctr, y_ctr = np.median(cluster, axis=0)[0]
+    #     # for idx, cluster in enumerate(all_clusters):
+    #     #     cluster = np.array(cluster, dtype=np.float32)
+    #     #     x_ctr, y_ctr = np.median(cluster, axis=0)[0]
 
-        return np.array(keypoints, dtype=np.float32), all_clusters
+    #     return np.array(keypoints, dtype=np.float32), all_clusters
 
 
-    # def cluster_keypoints(self, keyPoints, dist_threshold, max_cluster_size):
+    def cluster_keypoints(self, keyPoints, dist_threshold, max_cluster_size):
 
-    #     # sort based on distance to origin
-    #     keyPoints = keyPoints.tolist()
-    #     x_ctr = self.w / 2 - self.xmargin
-    #     y_ctr = self.h / 2 - self.ymargin
-    #     kp_sorted = sorted(keyPoints, key=lambda elem : (elem[0][0])**2 + (elem[0][1])**2)
+        # sort based on distance to origin
+        keyPoints = keyPoints.tolist()
+        x_ctr = self.w / 2 - self.xmargin
+        y_ctr = self.h / 2 - self.ymargin
+        kp_sorted = sorted(keyPoints, key=lambda elem : (elem[0][0])**2 + (elem[0][1])**2)
 
-    #     clustered_points = []
-    #     current_cluster = []
-    #     all_clusters = []
+        clustered_points = []
+        current_cluster = []
+        all_clusters = []
 
-    #     '''
-    #     Here we loop through all points. If one is close enough to the next, add it to a cluster
-    #     This should discard lone keypoints
-    #     '''
-    #     for idx in range(len(kp_sorted) - 1):
-    #         x1, y1 = kp_sorted[idx][0]
-    #         x2, y2 = kp_sorted[idx+1][0]
+        '''
+        Here we loop through all points. If one is close enough to the next, add it to a cluster
+        This should discard lone keypoints
+        '''
+        for idx in range(len(kp_sorted) - 1):
+            x1, y1 = kp_sorted[idx][0]
+            x2, y2 = kp_sorted[idx+1][0]
 
-    #         dist = ( (x2 - x1)**2 + (y2 - y1)**2 ) ** 0.5
+            dist = ( (x2 - x1)**2 + (y2 - y1)**2 ) ** 0.5
 
-    #         if dist < dist_threshold:
-    #             current_cluster.append( kp_sorted[idx] )
-    #         else:
-    #             if len(current_cluster) > max_cluster_size:
-    #                 clustered_points += current_cluster
-    #                 all_clusters.append(current_cluster)
-    #                 current_cluster = []
+            if dist < dist_threshold:
+                current_cluster.append( kp_sorted[idx] )
+            else:
+                if len(current_cluster) > max_cluster_size:
+                    clustered_points += current_cluster
+                    all_clusters.append(current_cluster)
+                    current_cluster = []
 
+        return np.array(clustered_points, dtype=np.float32), all_clusters
 
     def get_new_keypoints(self, img_grey, old_kp=None):
         '''
@@ -119,21 +120,23 @@ class CollisionDetector:
         '''
 
         # Get new keypoints directly from grey img
-        keypoints = cv2.goodFeaturesToTrack(img_grey, maxCorners=3000, qualityLevel=0.1, minDistance=5)
+        keypoints = cv2.goodFeaturesToTrack(img_grey, maxCorners=1500, qualityLevel=0.1, minDistance=5)
 
-        if old_kp is not None:
-            try:
-                keypoints = np.append(keypoints, old_kp, axis=0)
-            except ValueError:
-                keypoints = old_kp
+        # if old_kp is not None:
+        #     try:
+        #         keypoints = np.append(keypoints, old_kp, axis=0)
+        #     except ValueError:
+        #         keypoints = old_kp
 
         if keypoints is None:
             return [], None
 
-        self.show_image(self.old_img, keypoints, title="Without clustering")
+        self.show_image(self.old_img, keypoints, title="Without_clustering.jpg")
         # run clustering to reduce the amount of points OF has to track
-        # clustered_kp, clusters = self.cluster_keypoints(keypoints, dist_threshold=40, max_cluster_size=100)
-        clustered_kp, clusters = self.cluster_keypoints(keypoints)
+        print("Pre: ", len(keypoints))
+        clustered_kp, clusters = self.cluster_keypoints(keypoints, dist_threshold=40, max_cluster_size=50)
+        # clustered_kp, clusters = self.cluster_keypoints(keypoints)
+        print("Post: ", len(clustered_kp))
 
         if len(clustered_kp) == 0:
             return keypoints, None
@@ -165,22 +168,23 @@ class CollisionDetector:
         if foreground is None:
             foreground = [False] * len(keyPoints)
 
-        temp_img = img.copy()
+        temp_img = img[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin].copy()
         # add keypoints to image, then save or show user
         for coord, near_front in zip(keyPoints, foreground):
             x, y = coord.ravel()
-            centre = (int(x)+self.xmargin, int(y)+self.ymargin)
+            centre = (int(x), int(y))
             # colour in BGR
             colour = (255, 0, 0)
             if near_front:
                 colour = (0, 0, 255)
 
-            cv2.circle(temp_img, centre, 1, colour, 2)
+            cv2.circle(temp_img, centre, radius=3, color=colour, thickness=-1)
 
         if save_vid:
             self.vidwriter.write(temp_img)
         else:
-            cv2.imshow(title, temp_img)
+            # cv2.imshow(title, temp_img)
+            cv2.imwrite(title, temp_img)
             cv2.waitKey(1)
 
 
@@ -223,16 +227,17 @@ class CollisionDetector:
                 # The following code is used to test/evaluate the clustering algorithm
                 colours = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255), (255, 255, 255), (0, 0, 0)]
                 colourcycler = cycle(colours)
-
+                img = img[self.ymargin:-self.ymargin, self.xmargin:-self.xmargin]
                 for cluster in clusters:
                     colour = next(colourcycler)
                     for coord in cluster:
 
                         x, y = coord[0]
-                        centre = (int(x)+self.xmargin, int(y)+self.ymargin)
-                        cv2.circle(img, centre, 1, colour, 2)
-                cv2.imshow("With clustering", img)
-                cv2.waitKey(0)
+                        centre = (int(x), int(y))
+                        cv2.circle(img, centre, radius=3, color=colour, thickness=-1)
+                cv2.imwrite("With_clustering.jpg", img)
+                # cv2.waitKey(0)
+                break
 
                 t1 = time.time()
                 time_taken = t1 - t0
