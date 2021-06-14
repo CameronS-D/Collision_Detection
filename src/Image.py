@@ -8,10 +8,7 @@ class Image:
 
     def __init__(self, img, bgs):
         # resize image to lower resolution to reduce computation cost
-        self.original = img
-        # self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
-        # self.original = cv2.resize(img, dsize=(960, 720))
-        # self.original = cv2.resize(self.original, dsize=(0, 0), fx=0.5, fy=0.5)
+        self.original = cv2.resize(img, dsize=(0, 0), fx=0.5, fy=0.5)
         self.bgs = bgs
 
         self.h, self.w = self.original.shape[:2]
@@ -31,7 +28,6 @@ class Image:
 
         # get foreground mask from image and find contours in it
         fgMask = self.bgs.apply(self.cropped, learningRate=0.1)
-        self.fgMask = fgMask
 
         if cv2.__version__[0] == "3":
             _, contours, _ = cv2.findContours(fgMask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -78,7 +74,7 @@ class Image:
                 if near_front:
                     colour = (0, 0, 255)
 
-                cv2.circle(self.original, centre, radius=2, color=colour, thickness=-1)
+                cv2.circle(self.original, centre, radius=3, color=colour, thickness=-1)
 
         if safe_point is not None:
             x, y = safe_point
@@ -89,6 +85,7 @@ class Image:
 
 
     def show(self, title="Image", vid_writer=None, isColor=True):
+        # write img to file or display to user
 
         if vid_writer is not None:
             if isColor:

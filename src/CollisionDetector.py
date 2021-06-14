@@ -75,11 +75,12 @@ class CollisionDetector:
 
         all_clusters = [ [] for _ in range(n_clusters) ]
 
+        # use featue agglomeration to allocate each point to a cluster
         for kp, cluster_num in zip(keypoints, agglo.labels_):
             all_clusters[cluster_num].append(kp)
 
         for cluster in all_clusters:
-
+            # calculate centre/ dims of cluster
             cl = self.filter_cluster(np.array(cluster))
             xmax, ymax = cl.max(axis=0)[0]
             xmin, ymin = cl.min(axis=0)[0]
@@ -97,6 +98,8 @@ class CollisionDetector:
         return np.array(keypoints, dtype=np.float32), cluster_info
 
 
+
+    # Obselete clustering method
     # def cluster_keypoints(self, keyPoints, dist_threshold, max_cluster_size):
 
     #     # sort based on distance to origin
@@ -147,8 +150,6 @@ class CollisionDetector:
                 keypoints = old_kp
 
         # run clustering to reduce the amount of points OF has to track and group points into potential objects
-        # clustered_kp = self.cluster_keypoints(keypoints, dist_threshold=40, max_cluster_size=100)
-
         clustered_kp, cluster_info = self.cluster_keypoints(keypoints)
 
         return clustered_kp, cluster_info
@@ -203,9 +204,6 @@ class CollisionDetector:
 
                 haystack_template = new_img.grey[y_min:y_max, x_min:x_max]
                 haystack_template = cv2.resize(haystack_template, dsize=(new_w, new_h), interpolation=cv2.INTER_AREA)
-                # result = cv2.matchTemplate(needle_template, haystack_template, method=cv2.TM_SQDIFF_NORMED )
-                # score, _, _, _ = cv2.minMaxLoc(result)
-                # score *= scale ** (-2)
 
                 score = ((haystack_template - needle_template) ** 2).mean(axis=None)
 
@@ -234,6 +232,7 @@ class CollisionDetector:
 
         img_h, img_w = self.old_img.contour.shape[:2]
 
+        # Search the heatmap for largest space, if cant find anything, reduce required size of space until a min value is reached
         for i in range(img_h // sub_h):
             for j in range(img_w // sub_w):
                 sub_sec = arr[i*sub_h:(i+1)*sub_h, j*sub_w:(j+1)*sub_w]
@@ -261,6 +260,7 @@ class CollisionDetector:
         centroids = obstacles["centroids"]
         dims = obstacles["dims"]
 
+        # add obstacles to heatmap
         for (x, y), (w, h) in zip(centroids, dims):
             w *= 1.2
             h *= 1.2
@@ -271,8 +271,10 @@ class CollisionDetector:
 
             self.heatmap[y_min:y_max, x_min:x_max] = 1
 
+        # perform safepoint search
         safepoints = np.array(self.check_for_empty_space(self.heatmap, img_w, img_h))
 
+        # if multiple safepoints, select the one that is closest to the centre of the screen
         if len(safepoints) > 0:
             ctr_x = (img_w-1) // 2
             ctr_y = (img_h-1) // 2
@@ -291,6 +293,7 @@ class CollisionDetector:
         new_img = Image(frame, self.bgs)
 
         if self.old_img is None:
+            # Lots of things to setup when first frame is received
             self.vid_writer_color = self.setup_vid_writer(new_img, name="colour", isColor=True)
             self.vid_writer_contour = self.setup_vid_writer(new_img, name="contour", isColor=False)
             self.vid_writer_blank = self.setup_vid_writer(new_img, name="blank", isColor=True)
@@ -327,25 +330,23 @@ class CollisionDetector:
             fg = None
             safe_pnt = None
 
-        cv2.imwrite(f"./videos/Frames/mask_{self.frame_count}.jpg", new_img.fgMask)
-        cv2.imwrite(f"./videos/Frames/cropped_{self.frame_count}.jpg", new_img.cropped)
-        cv2.imwrite(f"./videos/Frames/contour_{self.frame_count}.jpg", new_img.contour)
 
-        # new_img.show(vid_writer=self.vid_writer_blank, isColor=True)
+        # Save video to output files for evaluation of results
+        new_img.show(vid_writer=self.vid_writer_blank, isColor=True)
 
         new_img.add_features(obstacles, old_kp, fg, safe_pnt)
 
-        # new_img.show(vid_writer=self.vid_writer_color, isColor=True)
-        # new_img.show(vid_writer=self.vid_writer_contour, isColor=False)
-        # new_img.show()
+        new_img.show(vid_writer=self.vid_writer_color, isColor=True)
+        new_img.show(vid_writer=self.vid_writer_contour, isColor=False)
+        new_img.show()
 
-
+        # Only search for new kaypoints every 15 frames in order to save processing time, otherwise only use those tracked by OF
         if self.frame_count % 15 == 0:
                 old_kp, cluster_info = self.get_new_keypoints(new_img, old_kp=old_kp)
         else:
             old_kp, cluster_info = self.cluster_keypoints(old_kp)
 
-
+        # For debugging
         if self.frame_count % 10 == 0:
             time_taken = time.time() - t0
             print("Took {:.3f} seconds to process frame {}".format(time_taken, self.frame_count))
@@ -358,13 +359,10 @@ class CollisionDetector:
 if __name__ == "__main__":
     CD = CollisionDetector()
     # vidstream = cv2.VideoCapture(0)
-    vidstream = cv2.VideoCapture("../videos/test_1_blank.avi")
+    vidstream = cv2.VideoCapture("../videos/dynamic_objs_1/output_blank.avi")
 
     if not vidstream.isOpened():
         raise Exception("Video stream would not open. ")
-
-    for _ in range(3000):
-        vidstream.read()
 
     while True:
         success, img = vidstream.read()
