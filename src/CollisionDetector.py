@@ -39,6 +39,7 @@ class CollisionDetector:
             h, w = img.contour.shape[:2]
 
         filename = os.path.join(os.getcwd(), "videos", "output_" + name + "." + extn)
+        # filename = "~/GDP/ROS_ws/catkin_ws/src/tello_tests/scripts/Collision_Detection/videos/output_" + name + "." + extn
         print("Writing output to {}".format(filename))
 
         fourcc = cv2.VideoWriter_fourcc(*codec)
@@ -303,7 +304,7 @@ class CollisionDetector:
             img_h, img_w = self.old_img.contour.shape[:2]
             self.heatmap = np.zeros(shape=(img_h, img_w))
             self.frame_count += 1
-            return
+            return False
 
         old_img, old_kp, cluster_info = self.old_img, self.old_kp, self.cluster_info
 
@@ -355,11 +356,17 @@ class CollisionDetector:
         self.old_kp, self.cluster_info = old_kp, cluster_info
         self.frame_count += 1
 
+        if obstacles is None:
+            return False
+        for (w, h) in obstacles["dims"]:
+            print(w*h)
+            return w * h > 5000
+
 
 if __name__ == "__main__":
     CD = CollisionDetector()
-    # vidstream = cv2.VideoCapture(0)
-    vidstream = cv2.VideoCapture("../videos/dynamic_objs_1/output_blank.avi")
+    vidstream = cv2.VideoCapture(0)
+    # vidstream = cv2.VideoCapture("../videos/dynamic_objs_1/output_blank.avi")
 
     if not vidstream.isOpened():
         raise Exception("Video stream would not open. ")
