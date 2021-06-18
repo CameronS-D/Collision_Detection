@@ -216,6 +216,8 @@ class CollisionDetector:
                     best_scale = scale
 
             if best_scale > scale_threshold and best_scale_score < 0.75 * control_score:
+                if width * height > 5000:
+                    print(best_scale)
                 obstacles["centroids"].append((x, y))
                 obstacles["dims"].append((width, height))
 
@@ -321,7 +323,7 @@ class CollisionDetector:
 
             # get bool array stating which points are estimated to be in the foreground
             fg = self.depth_estimation(matched_old_kp, matched_new_kp)
-            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.2)
+            obstacles = self.proximity_estimation(cluster_info, old_img, new_img, scale_threshold=1.3)
             old_kp = matched_new_kp
             safe_pnt = self.get_safe_point(obstacles)
 
@@ -333,12 +335,12 @@ class CollisionDetector:
 
 
         # Save video to output files for evaluation of results
-        new_img.show(vid_writer=self.vid_writer_blank, isColor=True)
+        # new_img.show(vid_writer=self.vid_writer_blank, isColor=True)
 
         new_img.add_features(obstacles, old_kp, fg, safe_pnt)
 
         new_img.show(vid_writer=self.vid_writer_color, isColor=True)
-        new_img.show(vid_writer=self.vid_writer_contour, isColor=False)
+        # new_img.show(vid_writer=self.vid_writer_contour, isColor=False)
         new_img.show()
 
         # Only search for new kaypoints every 15 frames in order to save processing time, otherwise only use those tracked by OF
@@ -359,14 +361,12 @@ class CollisionDetector:
         if obstacles is None:
             return False
         for (w, h) in obstacles["dims"]:
-            print(w*h)
             return w * h > 5000
 
 
 if __name__ == "__main__":
     CD = CollisionDetector()
     vidstream = cv2.VideoCapture(0)
-    # vidstream = cv2.VideoCapture("../videos/dynamic_objs_1/output_blank.avi")
 
     if not vidstream.isOpened():
         raise Exception("Video stream would not open. ")

@@ -4,6 +4,8 @@ The goal of this program is detect obstacles using only the monocular camera on 
 
 The implementation is largely based around this paper: https://staff.fnwi.uva.nl/a.visser/education/masterProjects/Obstacle%20Avoidance%20using%20Monocular%20Vision%20on%20Micro%20Aerial%20Vehicles_final.pdf
 
+@author: Cameron Stanislawski-Doyle (cfs18@ic.ac.uk)
+
 # Dependencies
 
 Python 2.7

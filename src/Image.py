@@ -4,6 +4,9 @@ import numpy as np
 import time
 
 class Image:
+
+    ''' Helper class to hold multiple versions of an image ''' 
+
     margin_sf = 0.1
 
     def __init__(self, img, bgs):
